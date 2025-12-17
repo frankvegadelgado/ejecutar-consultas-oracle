@@ -43,6 +43,149 @@ function Test-ExcelInstalled {
     }
 }
 
+# Funcion para ejecutar proceso con timeout
+function Invoke-ProcessWithTimeout {
+    param(
+        [string]$FilePath,
+        [string]$Arguments,
+        [int]$TimeoutSeconds = 30
+    )
+    
+    try {
+        $processInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $processInfo.FileName = $FilePath
+        $processInfo.Arguments = $Arguments
+        $processInfo.RedirectStandardError = $true
+        $processInfo.RedirectStandardOutput = $true
+        $processInfo.UseShellExecute = $false
+        $processInfo.CreateNoWindow = $true
+
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $processInfo
+        
+        # Iniciar el proceso
+        $process.Start() | Out-Null
+        
+        # Esperar con timeout
+        if ($process.WaitForExit($TimeoutSeconds * 1000)) {
+            # Proceso completado dentro del timeout
+            $stdout = $process.StandardOutput.ReadToEnd()
+            $stderr = $process.StandardError.ReadToEnd()
+            
+            return @{
+                Success = $true
+                ExitCode = $process.ExitCode
+                Stdout = $stdout
+                Stderr = $stderr
+                TimedOut = $false
+            }
+        } else {
+            # Timeout - matar el proceso
+            Write-Host "  [TIMEOUT] El proceso excedio el tiempo de espera ($TimeoutSeconds segundos)" -ForegroundColor Red
+            try {
+                $process.Kill()
+                Start-Sleep -Milliseconds 500
+            } catch {
+                # Intentar forzar la terminacion
+                try {
+                    Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+                } catch {}
+            }
+            
+            return @{
+                Success = $false
+                ExitCode = -1
+                Stdout = ""
+                Stderr = "TIMEOUT: El proceso excedio el tiempo de espera de $TimeoutSeconds segundos."
+                TimedOut = $true
+            }
+        }
+    }
+    catch {
+        return @{
+            Success = $false
+            ExitCode = -1
+            Stdout = ""
+            Stderr = "ERROR: $($_.Exception.Message)"
+            TimedOut = $false
+        }
+    }
+    finally {
+        # Asegurarse de que el proceso este cerrado
+        if ($process -and !$process.HasExited) {
+            try {
+                $process.Kill()
+            } catch {}
+        }
+    }
+}
+
+# Funcion para verificar conexion a red
+function Test-NetworkConnection {
+    param(
+        [string]$Hosting,
+        [int]$Port
+    )
+    
+    try {
+        Write-Host "Verificando conectividad de red..." -ForegroundColor Yellow -NoNewline
+        
+        # Intentar conexion TCP
+        $tcpClient = New-Object System.Net.Sockets.TcpClient
+        $connectResult = $tcpClient.BeginConnect($Hosting, $Port, $null, $null)
+        $waitResult = $connectResult.AsyncWaitHandle.WaitOne(10000, $false) # 10 segundos timeout
+        
+        if ($waitResult) {
+            $tcpClient.EndConnect($connectResult)
+            $tcpClient.Close()
+            Write-Host " [OK]" -ForegroundColor Green
+            return $true
+        } else {
+            $tcpClient.Close()
+            Write-Host " [FALLO]" -ForegroundColor Red
+            return $false
+        }
+    }
+    catch {
+        Write-Host " [FALLO]" -ForegroundColor Red
+        return $false
+    }
+}
+
+# Funcion para filtrar warnings de Java
+function Remove-JavaWarnings {
+    param(
+        [string]$Text
+    )
+    
+    if ([string]::IsNullOrEmpty($Text)) {
+        return $Text
+    }
+    
+    # Filtrar warnings especificos de Java 17+
+    $patterns = @(
+        'WARNING: A restricted method in java\.lang\.System has been called',
+        'WARNING: java\.lang\.System::[a-zA-Z]+ has been called',
+        'WARNING: Please consider reporting this to the maintainers',
+        'WARNING: Use --illegal-access=warn to enable warnings',
+        'WARNING: All illegal access operations will be denied',
+        'WARNING: An illegal reflective access operation has occurred',
+        'WARNING: Illegal reflective access by',
+        'WARNING: Using incubator modules'
+    )
+    
+    $result = $Text
+    foreach ($pattern in $patterns) {
+        # Usar regex para eliminar lineas completas que contengan estos warnings
+        $result = [regex]::Replace($result, "(?m)^\s*$pattern.*$[\r\n]*", "")
+    }
+    
+    # Eliminar lineas vacias multiples
+    $result = [regex]::Replace($result, "(?m)^\s*$[\r\n]+", "`r`n")
+    
+    return $result.Trim()
+}
+
 try {
     Write-Host "========================================" -ForegroundColor Cyan
     Write-Host " Ejecutor de Consultas SQL - Oracle" -ForegroundColor Cyan
@@ -175,6 +318,24 @@ try {
     Write-Host ""
 
     # ========================================
+    # Verificar conectividad de red primero
+    # ========================================
+    Write-Host "Validando conectividad de red hacia ${host_db}:${puerto}..." -ForegroundColor Yellow
+    $networkTest = Test-NetworkConnection -Hosting $host_db -Port $puertoInt
+    
+    if (-not $networkTest) {
+        Write-Host "[ERROR] No se puede conectar a $host_db en el puerto $puerto" -ForegroundColor Red
+        Write-Host ""
+        Write-Host "Por favor verifique:"
+        Write-Host "  1. Que el servidor Oracle este en ejecucion"
+        Write-Host "  2. Que el host y puerto sean correctos"
+        Write-Host "  3. Que no haya firewall bloqueando la conexion"
+        Write-Host "  4. Que tenga acceso de red al servidor"
+        Write-Host ""
+        throw "Error de conectividad de red"
+    }
+
+    # ========================================
     # Verificar estructura de carpetas
     # ========================================
     
@@ -249,12 +410,42 @@ try {
     Write-Host ""
 
     # ========================================
-    # Validar conexion a Oracle
+    # SOLUCION: Configurar variables de entorno para Java
+    # ========================================
+    Write-Host "Configurando variables de entorno para evitar warnings de Java..." -ForegroundColor Yellow
+    
+    # Crear archivo batch temporal para ejecutar SQLcl con las opciones correctas
+    $sqlclBatPath = Join-Path $env:TEMP "sqlcl_wrapper_$(Get-Random).bat"
+    
+    # Obtener el directorio de SQLcl
+    $sqlclDir = Split-Path $sqlclPath -Parent
+    
+    # Crear el batch que ejecutara SQLcl con las opciones de Java correctas
+    @"
+@echo off
+setlocal
+
+REM Configurar variables de entorno para evitar warnings de Java 17+
+set JAVA_TOOL_OPTIONS=-Duser.language=en -Duser.country=US
+set JDK_JAVA_OPTIONS=--add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED
+
+REM Cambiar al directorio de SQLcl
+cd /d "$sqlclDir"
+
+REM Ejecutar SQLcl con los argumentos pasados
+call sql.exe %*
+"@ | Out-File -FilePath $sqlclBatPath -Encoding ASCII
+
+    Write-Host "[OK] Wrapper creado para evitar warnings de Java" -ForegroundColor Green
+    Write-Host ""
+
+    # ========================================
+    # Validar conexion a Oracle (CON TIMEOUT)
     # ========================================
     
     $connectionString = "${usuario}/${password}@${host_db}:${puerto}/${sidService}"
     
-    Write-Host "Validando conexion a Oracle..." -ForegroundColor Yellow
+    Write-Host "Validando conexion a Oracle (timeout: 30 segundos)..." -ForegroundColor Yellow
     Write-Host ""
 
     # Crear script temporal para probar conexion
@@ -263,31 +454,32 @@ try {
 SET ECHO OFF
 SET FEEDBACK OFF
 SET HEADING OFF
+SET TIMING OFF
+SET TERMOUT OFF
 SELECT 'CONNECTION_OK' FROM DUAL;
 EXIT;
 "@ | Out-File -FilePath $testScript -Encoding UTF8
 
-    # Intentar conexion
-    $processInfo = New-Object System.Diagnostics.ProcessStartInfo
-    $processInfo.FileName = $sqlclPath
-    $processInfo.Arguments = "-S $connectionString @`"$testScript`""
-    $processInfo.RedirectStandardError = $true
-    $processInfo.RedirectStandardOutput = $true
-    $processInfo.UseShellExecute = $false
-    $processInfo.CreateNoWindow = $true
-
-    $process = New-Object System.Diagnostics.Process
-    $process.StartInfo = $processInfo
-    $process.Start() | Out-Null
-    $stdout = $process.StandardOutput.ReadToEnd()
-    $stderr = $process.StandardError.ReadToEnd()
-    $process.WaitForExit()
+    # Intentar conexion con timeout usando el wrapper
+    $testResult = Invoke-ProcessWithTimeout -FilePath $sqlclBatPath -Arguments "-S $connectionString @`"$testScript`"" -TimeoutSeconds 30
 
     # Limpiar archivo temporal
     Remove-Item $testScript -ErrorAction SilentlyContinue
 
-    if ($process.ExitCode -ne 0 -or $stdout -notlike "*CONNECTION_OK*") {
+    # Filtrar warnings de Java del resultado
+    $filteredStderr = Remove-JavaWarnings -Text $testResult.Stderr
+    
+    if (-not $testResult.Success -or $testResult.TimedOut) {
         Write-Host "[ERROR] No se pudo establecer conexion con Oracle" -ForegroundColor Red
+        Write-Host ""
+        
+        if ($testResult.TimedOut) {
+            Write-Host "La conexion se agoto (timeout de 30 segundos)" -ForegroundColor Yellow
+        } elseif ($filteredStderr -and $filteredStderr.Trim() -ne "") {
+            Write-Host "Error detallado:" -ForegroundColor Yellow
+            Write-Host $filteredStderr -ForegroundColor Red
+        }
+        
         Write-Host ""
         Write-Host "Verifique los siguientes datos:"
         Write-Host "  - Usuario: $usuario"
@@ -300,16 +492,43 @@ EXIT;
         Write-Host "  - Servidor Oracle no accesible"
         Write-Host "  - Firewall bloqueando la conexion"
         Write-Host "  - SID o Service Name incorrecto"
+        Write-Host "  - El servicio Oracle no esta en ejecucion"
         Write-Host ""
-        if ($stderr) {
-            Write-Host "Detalles del error:" -ForegroundColor Yellow
-            Write-Host $stderr -ForegroundColor Red
-            Write-Host ""
-        }
+        
+        # Limpiar archivo batch temporal
+        Remove-Item $sqlclBatPath -ErrorAction SilentlyContinue
+        
         throw "Error de conexion a Oracle"
     }
 
+    # Verificar la respuesta ignorando warnings
+    if ($testResult.Stdout -notlike "*CONNECTION_OK*") {
+        # Si hay warnings pero la conexion fue exitosa, verificar en stderr filtrado
+        if ($filteredStderr -and $filteredStderr.Trim() -ne "") {
+            Write-Host "[ADVERTENCIA] Hubo advertencias durante la conexion:" -ForegroundColor Yellow
+            Write-Host $filteredStderr -ForegroundColor DarkYellow
+            Write-Host ""
+        }
+        
+        # Verificar si realmente fallo o solo hay warnings
+        Write-Host "[ERROR] Respuesta inesperada del servidor Oracle" -ForegroundColor Red
+        Write-Host ""
+        Write-Host "Respuesta recibida:" -ForegroundColor Yellow
+        Write-Host $testResult.Stdout -ForegroundColor Red
+        
+        # Limpiar archivo batch temporal
+        Remove-Item $sqlclBatPath -ErrorAction SilentlyContinue
+        
+        throw "Error en validacion de conexion"
+    }
+
     Write-Host "[OK] Conexion establecida correctamente" -ForegroundColor Green
+    
+    # Mostrar warnings si los hay (filtrados)
+    if ($filteredStderr -and $filteredStderr.Trim() -ne "") {
+        Write-Host "[INFO] Nota: Se ignoraron warnings de Java durante la conexion" -ForegroundColor Gray
+    }
+    
     Write-Host ""
 
     # ========================================
@@ -324,6 +543,10 @@ EXIT;
         Write-Host ""
         Write-Host "Por favor, agregue sus consultas SQL en la carpeta 'consultas' y vuelva a ejecutar el script."
         Write-Host ""
+        
+        # Limpiar archivo batch temporal
+        Remove-Item $sqlclBatPath -ErrorAction SilentlyContinue
+        
         return
     }
 
@@ -334,11 +557,12 @@ EXIT;
     Write-Host ""
 
     # ========================================
-    # Procesar cada archivo SQL
+    # Procesar cada archivo SQL (CON TIMEOUT)
     # ========================================
     
     $procesados = 0
     $errores = 0
+    $timeouts = 0
 
     foreach ($archivo in $archivosSql) {
         $nombreArchivo = $archivo.Name
@@ -366,37 +590,50 @@ SET PAGESIZE 0
 SET LINESIZE 32767
 SET TRIMSPOOL ON
 SET SQLFORMAT csv
+SET TERMOUT OFF
 SPOOL $archivoTempCsv
 @"$($archivo.FullName)"
 SPOOL OFF
 EXIT;
 "@ | Out-File -FilePath $wrapperScript -Encoding UTF8
         
-        # Ejecutar consulta
-        $queryProcessInfo = New-Object System.Diagnostics.ProcessStartInfo
-        $queryProcessInfo.FileName = $sqlclPath
-        $queryProcessInfo.Arguments = "-S $connectionString @`"$wrapperScript`""
-        $queryProcessInfo.RedirectStandardError = $true
-        $queryProcessInfo.RedirectStandardOutput = $true
-        $queryProcessInfo.UseShellExecute = $false
-        $queryProcessInfo.CreateNoWindow = $true
-
-        $queryProcess = New-Object System.Diagnostics.Process
-        $queryProcess.StartInfo = $queryProcessInfo
-        $queryProcess.Start() | Out-Null
-        $queryStdout = $queryProcess.StandardOutput.ReadToEnd()
-        $queryStderr = $queryProcess.StandardError.ReadToEnd()
-        $queryProcess.WaitForExit()
+        # Ejecutar consulta CON TIMEOUT (30 minutos = 1800 segundos) usando el wrapper
+        Write-Host "  > Ejecutando consulta (timeout: 30 minutos)..." -ForegroundColor Gray
+        $queryResult = Invoke-ProcessWithTimeout -FilePath $sqlclBatPath -Arguments "-S $connectionString @`"$wrapperScript`"" -TimeoutSeconds 1800
 
         # Limpiar script temporal
         Remove-Item $wrapperScript -ErrorAction SilentlyContinue
 
-        # Verificar si la consulta se ejecuto correctamente
-        if ($queryProcess.ExitCode -ne 0 -or -not (Test-Path $archivoTempCsv)) {
-            Write-Host "  [ERROR] Fallo la ejecucion de la consulta" -ForegroundColor Red
-            if ($queryStderr) {
-                Write-Host "  Detalles: $($queryStderr.Trim().Substring(0, [Math]::Min(200, $queryStderr.Length)))" -ForegroundColor DarkRed
+        # Filtrar warnings de Java
+        $filteredQueryStderr = Remove-JavaWarnings -Text $queryResult.Stderr
+        
+        # Verificar si hubo timeout
+        if ($queryResult.TimedOut) {
+            Write-Host "  [TIMEOUT] La consulta excedio el tiempo maximo de ejecucion (30 minutos)" -ForegroundColor Red
+            $timeouts++
+            $errores++
+            
+            # Intentar limpiar archivos temporales
+            if (Test-Path $archivoTempCsv) {
+                Remove-Item $archivoTempCsv -ErrorAction SilentlyContinue
             }
+            Write-Host ""
+            continue
+        }
+
+        # Verificar si la consulta se ejecuto correctamente (ignorando warnings)
+        if (-not (Test-Path $archivoTempCsv)) {
+            Write-Host "  [ERROR] Fallo la ejecucion de la consulta - No se generó el archivo CSV" -ForegroundColor Red
+            
+            # Mostrar solo errores reales (filtrados de warnings)
+            if ($filteredQueryStderr -and $filteredQueryStderr.Trim() -ne "") {
+                $errorMsg = $filteredQueryStderr.Trim()
+                if ($errorMsg.Length -gt 300) {
+                    $errorMsg = $errorMsg.Substring(0, 300) + "..."
+                }
+                Write-Host "  Detalles: $errorMsg" -ForegroundColor DarkRed
+            }
+            
             $errores++
             Write-Host ""
             continue
@@ -408,6 +645,12 @@ EXIT;
         
         if ($lineas.Count -le 1) {
             Write-Host "  [ADVERTENCIA] La consulta no devolvio datos o solo contiene encabezados" -ForegroundColor Yellow
+            
+            # Mostrar warnings si los hay
+            if ($filteredQueryStderr -and $filteredQueryStderr.Trim() -ne "") {
+                Write-Host "  Nota: $($filteredQueryStderr.Trim())" -ForegroundColor DarkYellow
+            }
+            
             Remove-Item $archivoTempCsv -ErrorAction SilentlyContinue
             $procesados++
             Write-Host ""
@@ -463,6 +706,11 @@ EXIT;
                     $workbook.SaveAs($rutaSalida, $xlFileFormat)
                     
                     Write-Host "  [OK] Archivo Excel generado: $archivoSalida" -ForegroundColor Green
+                    
+                    # Mostrar warnings si los hubo durante la consulta
+                    if ($filteredQueryStderr -and $filteredQueryStderr.Trim() -ne "") {
+                        Write-Host "  [INFO] Nota: Se ignoraron warnings de Java durante la ejecucion" -ForegroundColor Gray
+                    }
                 }
                 catch {
                     Write-Host "  [ERROR] Error al convertir a Excel: $($_.Exception.Message)" -ForegroundColor Red
@@ -471,7 +719,9 @@ EXIT;
                 finally {
                     # Cerrar todo correctamente
                     if ($workbook) {
-                        try { $workbook.Close($false) } catch {}
+                        try { 
+                            $workbook.Close($false) 
+                        } catch {}
                         [System.Runtime.Interopservices.Marshal]::ReleaseComObject($workbook) | Out-Null
                     }
                     
@@ -488,6 +738,11 @@ EXIT;
                 # Solo CSV - mover el archivo temporal a la ubicacion final
                 Move-Item -Path $archivoTempCsv -Destination $rutaSalida -Force
                 Write-Host "  [OK] Archivo CSV generado: $archivoSalida" -ForegroundColor Green
+                
+                # Mostrar warnings si los hubo durante la consulta
+                if ($filteredQueryStderr -and $filteredQueryStderr.Trim() -ne "") {
+                    Write-Host "  [INFO] Nota: Se ignoraron warnings de Java durante la ejecucion" -ForegroundColor Gray
+                }
             }
             
             $procesados++
@@ -515,6 +770,11 @@ EXIT;
     }
 
     # ========================================
+    # Limpiar archivo batch temporal
+    # ========================================
+    Remove-Item $sqlclBatPath -ErrorAction SilentlyContinue
+
+    # ========================================
     # Resumen final
     # ========================================
     
@@ -524,6 +784,9 @@ EXIT;
     Write-Host ""
     Write-Host "Archivos procesados: $procesados" -ForegroundColor Green
     Write-Host "Errores encontrados: $errores" -ForegroundColor $(if ($errores -gt 0) { "Red" } else { "Green" })
+    if ($timeouts -gt 0) {
+        Write-Host "Timeouts de consulta: $timeouts" -ForegroundColor Yellow
+    }
     Write-Host ""
 
     if ($errores -gt 0) {
@@ -533,6 +796,7 @@ EXIT;
         Write-Host "  - La sintaxis de las consultas SQL"
         Write-Host "  - La conectividad con el servidor Oracle"
         Write-Host "  - Que Excel no este bloqueado por otro proceso"
+        Write-Host "  - Si hay timeouts, considere optimizar las consultas largas"
         Write-Host ""
     }
 
@@ -577,6 +841,15 @@ finally {
     # ========================================
     # BLOQUE FINALLY - Siempre se ejecuta
     # ========================================
+    # Limpiar procesos SQLcl que puedan haber quedado
+    Get-Process | Where-Object { $_.ProcessName -eq "sql" } | Stop-Process -Force -ErrorAction SilentlyContinue
+    
+    # Limpiar archivo batch temporal si existe
+    $batFiles = Get-ChildItem "$env:TEMP\sqlcl_wrapper_*.bat" -ErrorAction SilentlyContinue
+    foreach ($batFile in $batFiles) {
+        Remove-Item $batFile.FullName -ErrorAction SilentlyContinue
+    }
+    
     Write-Host "Presione ENTER para salir..." -ForegroundColor Cyan
     $null = Read-Host
 }
