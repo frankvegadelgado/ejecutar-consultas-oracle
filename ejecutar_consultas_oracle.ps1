@@ -99,7 +99,7 @@ try {
 
     # Formato de salida
     do {
-        $tipoSalida = Read-Host "Formato de salida (1=CSV, 2=JSON) [Por defecto: 1]"
+        $tipoSalida = Read-Host "Formato de salida (1=CSV, 2=XLSX/Excel) [Por defecto: 1]"
         if ([string]::IsNullOrWhiteSpace($tipoSalida)) {
             $tipoSalida = "1"
         }
@@ -107,10 +107,12 @@ try {
         if ($tipoSalida -eq "1") {
             $extension = "csv"
             $formato = "csv"
+            $formatoDisplay = "CSV"
         }
         elseif ($tipoSalida -eq "2") {
-            $extension = "json"
-            $formato = "json"
+            $extension = "xlsx"
+            $formato = "xlsx"
+            $formatoDisplay = "XLSX (Excel)"
         }
         else {
             Write-Host "[ERROR] Opcion invalida. Debe ser 1 o 2" -ForegroundColor Red
@@ -125,7 +127,7 @@ try {
     Write-Host "  Host: $host_db"
     Write-Host "  Puerto: $puerto"
     Write-Host "  SID/Service: $sidService"
-    Write-Host "  Formato: $($formato.ToUpper())"
+    Write-Host "  Formato: $formatoDisplay"
     Write-Host ""
 
     # ========================================
@@ -310,33 +312,25 @@ EXIT;
         # Crear script temporal con comandos SQLcl
         $wrapperScript = Join-Path $env:TEMP "wrapper_$(Get-Random).sql"
         
-        if ($formato -eq "csv") {
-            @"
+        # SQLcl solo soporta CSV nativamente, para XLSX exportamos primero a CSV
+        $rutaCsvTemporal = if ($formato -eq "xlsx") {
+            Join-Path $env:TEMP "temp_$(Get-Random).csv"
+        } else {
+            $rutaSalida
+        }
+        
+        @"
 SET ECHO OFF
 SET FEEDBACK OFF
 SET PAGESIZE 0
 SET LINESIZE 32767
 SET TRIMSPOOL ON
 SET SQLFORMAT csv
-SPOOL $rutaSalida
+SPOOL $rutaCsvTemporal
 @"$($archivo.FullName)"
 SPOOL OFF
 EXIT;
 "@ | Out-File -FilePath $wrapperScript -Encoding UTF8
-        }
-        else {
-            # JSON format
-            @"
-SET ECHO OFF
-SET FEEDBACK OFF
-SET PAGESIZE 0
-SET SQLFORMAT json
-SPOOL $rutaSalida
-@"$($archivo.FullName)"
-SPOOL OFF
-EXIT;
-"@ | Out-File -FilePath $wrapperScript -Encoding UTF8
-        }
         
         # Ejecutar consulta
         $queryProcessInfo = New-Object System.Diagnostics.ProcessStartInfo

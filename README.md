@@ -1,6 +1,6 @@
 # Ejecutor de Consultas SQL para Oracle
 
-Script automatizado en PowerShell para ejecutar múltiples consultas SQL en Oracle utilizando **Oracle SQLcl** y exportar los resultados a CSV o JSON.
+Script automatizado en PowerShell para ejecutar múltiples consultas SQL en Oracle utilizando **Oracle SQLcl** y exportar los resultados a CSV o XLSX (Excel).
 
 ## 📋 Requisitos Previos
 
@@ -25,14 +25,14 @@ SQLcl (SQL Command Line) es:
 - ✅ Multiplataforma (Windows, Linux, Mac)
 - ✅ Moderno y con más funcionalidades que SQL*Plus
 - ✅ No requiere instalación de Oracle Client completo
-- ✅ Incluye soporte para JSON, CSV y otros formatos
+- ✅ Incluye soporte para CSV y Excel (XLSX)
 - ✅ Solo requiere Java (incluido en la descarga)
 
 #### Descarga e Instalación de SQLcl
 
 ##### **Paso 1: Descargar SQLcl**
 
-1. Visite: [https://www.oracle.com/database/sqldeveloper/technologies/sqlcl/download/](https://www.oracle.com/database/sqldeveloper/technologies/sqlcl/download/)
+1. Visite: https://www.oracle.com/database/sqldeveloper/technologies/sqlcl/download/
 2. Descargue la versión más reciente (archivo `.zip`)
 3. **No requiere cuenta de Oracle** para la descarga básica
 
@@ -109,6 +109,14 @@ El script buscará automáticamente SQLcl en:
 - `%USERPROFILE%\sqlcl\bin\sql.exe`
 - `%ORACLE_HOME%\sqlcl\bin\sql.exe`
 - Variable `PATH` del sistema
+
+### 4. Microsoft Excel (Solo para exportar a XLSX)
+
+Si desea exportar resultados en formato XLSX (Excel), necesita tener **Microsoft Excel instalado** en su sistema.
+
+- El script funciona con **Excel 2007 o superior**
+- **NO es necesario** si solo usa formato CSV
+- El script automáticamente convierte CSV a XLSX usando Excel COM Automation
 
 ## 🔐 Configuración de Permisos de PowerShell
 
@@ -188,6 +196,21 @@ Ejecutar el script **sin modificar la política** del sistema:
    ```powershell
    powershell.exe -ExecutionPolicy Bypass -File .\ejecutar_consultas_oracle.ps1
    ```
+
+### ⚠️ Solución de Problemas con Permisos
+
+#### Error: "No se puede cargar el archivo... porque la ejecución de scripts está deshabilitada"
+
+**Solución:**
+- Use la **Opción 1** (Click derecho > Ejecutar con PowerShell)
+- O use la **Opción 2** (Cambiar política de ejecución)
+- O use la **Opción 3** (Bypass)
+
+#### Error: "Acceso denegado"
+
+**Solución:**
+- Asegúrese de ejecutar PowerShell **como Administrador** al cambiar políticas
+- Verifique que tiene permisos sobre la carpeta donde está el script
 
 ## 🚀 Configuración del Proyecto
 
@@ -311,10 +334,10 @@ Ingrese el SID o Service Name: ORCL
 
 #### 6. Formato de Salida
 ```
-Formato de salida (1=CSV, 2=JSON) [Por defecto: 1]: 1
+Formato de salida (1=CSV, 2=XLSX/Excel) [Por defecto: 1]: 1
 ```
 - Ingrese **1** para exportar a CSV (predeterminado)
-- Ingrese **2** para exportar a JSON
+- Ingrese **2** para exportar a XLSX/Excel (**requiere Microsoft Excel instalado**)
 - Si presiona ENTER sin escribir nada, se usará CSV por defecto
 
 ### Proceso de Ejecución
@@ -330,6 +353,7 @@ Una vez ingresados todos los datos:
    - Conecta a Oracle con las credenciales proporcionadas
    - Ejecuta la consulta SQL
    - Exporta los resultados con un nombre único
+   - Si eligió XLSX, convierte automáticamente de CSV a Excel
 7. Muestra un resumen del procesamiento con colores
 8. **Siempre espera** que presione ENTER antes de cerrar
 
@@ -342,7 +366,7 @@ Los archivos de resultados se guardan con el siguiente formato:
 
 **Ejemplos:**
 - `ventas_2024_20241217_143055.csv`
-- `clientes_activos_20241217_144512.json`
+- `clientes_activos_20241217_144512.xlsx`
 
 Esto permite:
 - Identificar fácilmente qué consulta generó el resultado
@@ -488,6 +512,24 @@ Procesando: consulta_invalida.sql
 - Revise los permisos del usuario en Oracle
 - Simplifique consultas muy complejas
 
+#### Error al convertir a Excel
+```
+[ERROR] Fallo la conversion a Excel
+Detalles: ...
+Nota: Se requiere Microsoft Excel instalado para exportar a XLSX
+```
+
+**Posibles causas:**
+- Microsoft Excel no está instalado
+- Excel está abierto y bloqueando archivos
+- Permisos insuficientes para crear archivos COM
+
+**Solución:**
+1. Instale Microsoft Excel 2007 o superior
+2. Cierre todas las instancias de Excel antes de ejecutar el script
+3. Use formato CSV si no tiene Excel instalado
+4. Ejecute PowerShell como administrador si hay problemas de permisos
+
 ## 📊 Ejemplo Completo de Uso
 
 ### Paso a Paso
@@ -534,6 +576,13 @@ Procesando: consulta_invalida.sql
    top_clientes_20241217_150033.csv
    inventario_actual_20241217_150033.csv
    ```
+   
+   O si eligió Excel (opción 2):
+   ```
+   ventas_mensuales_20241217_150033.xlsx
+   top_clientes_20241217_150033.xlsx
+   inventario_actual_20241217_150033.xlsx
+   ```
 
 8. **Opcional - Restaurar seguridad:**
    ```powershell
@@ -573,6 +622,12 @@ Procesando: consulta_invalida.sql
 - Asegúrese de que su Excel esté configurado para UTF-8
 - Use "Importar datos" en Excel en lugar de doble click
 
+### Problemas con exportación a Excel (XLSX)
+- **Requiere Microsoft Excel instalado** en el sistema
+- Cierre todas las instancias de Excel antes de ejecutar el script
+- Si no tiene Excel, use formato CSV (opción 1)
+- El script convierte automáticamente CSV a XLSX usando Excel COM
+
 ### La ventana se cierra inmediatamente
 - **Nunca debería ocurrir** gracias al bloque `finally`
 - Si ocurre, ejecute desde PowerShell directamente para ver el error
@@ -583,10 +638,18 @@ Procesando: consulta_invalida.sql
 
 ✅ **Gratuito y ligero** - No requiere Oracle Client completo  
 ✅ **Multiplataforma** - Funciona en Windows, Linux, Mac  
-✅ **Formatos modernos** - CSV, JSON, HTML, XML  
+✅ **Formato CSV nativo** - Exportación directa y eficiente  
 ✅ **Rápido y eficiente** - Mejor rendimiento que SQL*Plus  
 ✅ **Actualizado** - Soporta las últimas versiones de Oracle  
 ✅ **Sin instalación compleja** - Solo extraer y usar  
+
+### Cómo Funciona la Exportación a Excel
+
+1. **SQLcl exporta a CSV**: Oracle SQLcl genera el archivo CSV (formato nativo)
+2. **PowerShell convierte a XLSX**: Si eligió Excel, el script usa COM Automation para convertir
+3. **Resultado final**: Archivo Excel nativo (.xlsx) listo para usar
+
+**Nota:** La conversión a XLSX requiere Microsoft Excel instalado. Si no lo tiene, use CSV que es universalmente compatible.
 
 ### Ventajas del Script PowerShell
 
@@ -596,6 +659,7 @@ Procesando: consulta_invalida.sql
 ✅ **Mejor manejo de strings** - Sin problemas con espacios  
 ✅ **Objetos y propiedades** - Código más limpio  
 ✅ **Contraseña enmascarada** - Mayor seguridad  
+✅ **Conversión automática a Excel** - CSV a XLSX con un click  
 
 ### Colores Utilizados
 
@@ -615,6 +679,8 @@ Procesando: consulta_invalida.sql
 - El script es compatible con **Oracle 11g, 12c, 18c, 19c, 21c y 23c**
 - PowerShell 5.1 viene **preinstalado** en Windows 10 y 11
 - SQLcl requiere Java, pero viene incluido en el paquete
+- La conversión a XLSX usa **Excel COM Automation** (requiere Excel instalado)
+- Formato CSV funciona sin necesidad de Microsoft Excel
 
 ## 🔒 Seguridad y Mejores Prácticas
 
@@ -635,10 +701,31 @@ Procesando: consulta_invalida.sql
    - Use permisos de solo lectura cuando sea posible
    - No incluya credenciales en los archivos .sql
 
-4. **Red:**
+4. **Exportación a Excel:**
+   - Si usa formato XLSX, asegúrese de cerrar Excel antes de ejecutar
+   - Los archivos Excel pueden ser más grandes que CSV
+   - CSV es más seguro y portable si no necesita formato específico
+
+5. **Red:**
    - Use conexiones seguras (Oracle Advanced Security)
    - Considere VPN para conexiones remotas
    - Verifique configuraciones de firewall
+
+## 🆚 Comparación: SQLcl vs SQL*Plus
+
+| Característica | SQLcl | SQL*Plus |
+|---------------|-------|----------|
+| **Gratuito** | ✅ Sí | ✅ Sí |
+| **Formato CSV** | ✅ Nativo | ⚠️ Manual |
+| **Formato Excel** | ⚠️ Via conversión | ❌ No |
+| **Instalación** | ✅ Extraer ZIP | ⚠️ Requiere Oracle Client |
+| **Tamaño** | ~50 MB | ~200+ MB |
+| **Scripting** | ✅ Excelente | ✅ Bueno |
+| **Multiplataforma** | ✅ Sí | ✅ Sí |
+| **Moderno** | ✅ Sí | ❌ Antiguo |
+| **Automatización** | ✅ Excelente | ✅ Bueno |
+
+**Conclusión:** SQLcl es la mejor opción para automatización moderna con Oracle.
 
 ## 📄 Licencia
 
