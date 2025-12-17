@@ -14,7 +14,143 @@ Para verificar su versión de PowerShell:
 2. Ejecute: `$PSVersionTable.PSVersion`
 3. Debe mostrar versión 5.1 o superior
 
-### 3. Oracle SQLcl
+### 3. Java Runtime Environment (JRE) o Java Development Kit (JDK)
+
+**Oracle SQLcl requiere Java 17 o superior** para funcionar. Debe tener instalado Java Runtime Environment (JRE) o Java Development Kit (JDK) versión **17.0.5 o superior**.
+
+#### Verificar si Java está Instalado
+
+Abra PowerShell o CMD y ejecute:
+```powershell
+java -version
+```
+
+Si Java está instalado, verá algo como:
+```
+java version "17.0.9" 2023-10-17 LTS
+Java(TM) SE Runtime Environment (build 17.0.9+11-LTS-201)
+```
+
+Si muestra un error o una versión menor a 17, necesita instalar o actualizar Java.
+
+#### Descargar e Instalar Java
+
+##### **Opción 1: Oracle JDK (Recomendado para uso comercial)**
+
+1. **Descargar Oracle JDK:**
+   - Visite: https://www.oracle.com/java/technologies/downloads/
+   - Seleccione **Java 17** o superior (Java 25 es la versión LTS más reciente)
+   - En la sección "Windows", descargue el instalador:
+     - **x64 Installer** (archivo `.exe`) para Windows 64-bit
+     - Tamaño aproximado: 150-200 MB
+
+2. **Instalar Oracle JDK:**
+   - Ejecute el instalador descargado (`.exe`)
+   - Siga el asistente de instalación
+   - Anote la ruta de instalación (por defecto: `C:\Program Files\Java\jdk-17` o similar)
+   - Complete la instalación
+
+##### **Opción 2: OpenJDK (Gratuito y de código abierto)**
+
+1. **Descargar OpenJDK:**
+   - Visite: https://adoptium.net/ (Eclipse Temurin)
+   - Seleccione:
+     - **Version:** Java 17 (LTS) o superior
+     - **Operating System:** Windows
+     - **Architecture:** x64
+   - Click en "Download JDK"
+   - Tamaño aproximado: 100-150 MB
+
+2. **Instalar OpenJDK:**
+   - Ejecute el instalador descargado (`.msi`)
+   - Durante la instalación, asegúrese de marcar:
+     - ✅ **"Set JAVA_HOME variable"**
+     - ✅ **"Add to PATH"**
+   - Complete la instalación
+
+##### **Opción 3: Microsoft Build of OpenJDK**
+
+1. **Descargar Microsoft OpenJDK:**
+   - Visite: https://learn.microsoft.com/en-us/java/openjdk/download
+   - Seleccione **Java 17 LTS** o superior
+   - Descargue el instalador `.msi` para Windows x64
+   - Tamaño aproximado: 100-150 MB
+
+2. **Instalar:**
+   - Ejecute el instalador `.msi`
+   - Siga el asistente de instalación
+   - Complete la instalación
+
+#### Configurar Variables de Entorno de Java
+
+Si el instalador no configuró automáticamente las variables de entorno, debe hacerlo manualmente:
+
+##### **Paso 1: Configurar JAVA_HOME**
+
+1. **Abrir Variables de Entorno:**
+   - Presione `Win + R`
+   - Escriba: `sysdm.cpl`
+   - Presione ENTER
+   - Click en la pestaña **"Opciones avanzadas"**
+   - Click en **"Variables de entorno..."**
+
+2. **Crear/Editar JAVA_HOME:**
+   - En la sección **"Variables del sistema"**, click en **"Nueva..."** (o "Editar..." si ya existe)
+   - **Nombre de la variable:** `JAVA_HOME`
+   - **Valor de la variable:** Ruta donde instaló Java
+     - Oracle JDK: `C:\Program Files\Java\jdk-17`
+     - OpenJDK (Adoptium): `C:\Program Files\Eclipse Adoptium\jdk-17.0.9.9-hotspot`
+     - Microsoft OpenJDK: `C:\Program Files\Microsoft\jdk-17.0.9.9-hotspot`
+   - Click **"Aceptar"**
+
+##### **Paso 2: Agregar Java al PATH**
+
+1. **Editar la Variable PATH:**
+   - En **"Variables del sistema"**, busque la variable **`Path`**
+   - Selecciónela y click en **"Editar..."**
+   - Click en **"Nuevo"**
+   - Agregue: `%JAVA_HOME%\bin`
+   - Click **"Aceptar"** en todas las ventanas
+
+##### **Paso 3: Verificar la Configuración**
+
+1. **Abra una NUEVA ventana de PowerShell o CMD** (importante para que cargue las nuevas variables)
+2. **Verifique JAVA_HOME:**
+   ```powershell
+   echo $env:JAVA_HOME
+   ```
+   Debería mostrar: `C:\Program Files\Java\jdk-17` (o la ruta que configuró)
+
+3. **Verifique Java:**
+   ```powershell
+   java -version
+   ```
+   Debería mostrar la versión de Java instalada (17 o superior)
+
+#### Solución de Problemas con Java
+
+##### Java no se reconoce después de instalar
+
+**Solución:**
+- Cierre TODAS las ventanas de PowerShell/CMD abiertas
+- Abra una NUEVA ventana de PowerShell
+- Ejecute: `java -version`
+
+##### Error: "JAVA_HOME no está definido"
+
+**Solución:**
+- Verifique que configuró JAVA_HOME correctamente
+- Asegúrese de usar la ruta completa hasta la carpeta principal de Java
+- No incluya `\bin` en JAVA_HOME, solo en PATH
+
+##### Versión incorrecta de Java
+
+Si tiene múltiples versiones de Java instaladas:
+1. Verifique cuál está en PATH: `where java`
+2. Asegúrese de que JAVA_HOME apunte a Java 17 o superior
+3. Edite PATH para que `%JAVA_HOME%\bin` esté al INICIO de la lista
+
+### 4. Oracle SQLcl
 
 **Oracle SQLcl** es la herramienta de línea de comandos moderna de Oracle que reemplaza a SQL*Plus. Es gratuita, ligera y no requiere instalación completa de Oracle Client.
 
@@ -26,7 +162,7 @@ SQLcl (SQL Command Line) es:
 - ✅ Moderno y con más funcionalidades que SQL*Plus
 - ✅ No requiere instalación de Oracle Client completo
 - ✅ Incluye soporte para CSV y Excel (XLSX)
-- ✅ Solo requiere Java (incluido en la descarga)
+- ⚠️ **Requiere Java 17 o superior** (no incluido)
 
 #### Descarga e Instalación de SQLcl
 
@@ -36,7 +172,7 @@ SQLcl (SQL Command Line) es:
 2. Descargue la versión más reciente (archivo `.zip`)
 3. **No requiere cuenta de Oracle** para la descarga básica
 
-**Tamaño aproximado:** 40-50 MB
+**Tamaño aproximado:** 20-30 MB
 
 ##### **Paso 2: Instalar SQLcl**
 
@@ -57,10 +193,6 @@ SQLcl (SQL Command Line) es:
    └── LICENSE.txt
    ```
 
-3. **Verificar Java (Incluido):**
-   - SQLcl incluye su propio Java Runtime
-   - No necesita instalar Java por separado
-
 ##### **Paso 3: Verificar la Instalación**
 
 Abra PowerShell o CMD y ejecute:
@@ -80,6 +212,11 @@ Debería mostrar algo como:
 SQLcl: Release 23.4 Production
 Build: 23.4.0.341.0944
 ```
+
+Si recibe un error sobre Java, asegúrese de que:
+- Java 17 o superior está instalado
+- JAVA_HOME está configurado correctamente
+- `%JAVA_HOME%\bin` está en PATH
 
 ##### **Paso 4 (Opcional): Agregar SQLcl al PATH**
 
@@ -110,7 +247,7 @@ El script buscará automáticamente SQLcl en:
 - `%ORACLE_HOME%\sqlcl\bin\sql.exe`
 - Variable `PATH` del sistema
 
-### 4. Microsoft Excel (Solo para exportar a XLSX)
+### 5. Microsoft Excel (Solo para exportar a XLSX)
 
 Si desea exportar resultados en formato XLSX (Excel), necesita tener **Microsoft Excel instalado** en su sistema.
 
@@ -454,6 +591,18 @@ https://www.oracle.com/database/sqldeveloper/technologies/sqlcl/download/
 ```
 **Solución:** Descargue e instale Oracle SQLcl siguiendo las instrucciones de este README.
 
+#### Error: Java no encontrado o versión incorrecta
+```
+Error: Java no está instalado o la versión es incorrecta
+SQLcl requiere Java 17 o superior
+```
+
+**Solución:**
+1. Instale Java 17 o superior (ver sección "Java Runtime Environment")
+2. Configure JAVA_HOME correctamente
+3. Agregue `%JAVA_HOME%\bin` al PATH
+4. Abra una nueva ventana de PowerShell y verifique: `java -version`
+
 ### Errores de Conexión
 
 #### Error: No se puede conectar a Oracle
@@ -534,16 +683,23 @@ Nota: Se requiere Microsoft Excel instalado para exportar a XLSX
 
 ### Paso a Paso
 
-1. **Descargar e instalar Oracle SQLcl**
+1. **Instalar Java 17 o superior**
+   - Descargue desde: https://adoptium.net/ (recomendado) o https://www.oracle.com/java/technologies/downloads/
+   - Instale y configure JAVA_HOME
+   - Agregue `%JAVA_HOME%\bin` al PATH
+   - Verifique: `java -version`
+
+2. **Descargar e instalar Oracle SQLcl**
    - Descargue desde: https://www.oracle.com/database/sqldeveloper/technologies/sqlcl/download/
    - Extraiga a `C:\oracle\sqlcl\`
+   - Verifique: `C:\oracle\sqlcl\bin\sql.exe -V`
 
-2. **Configurar permisos de PowerShell** (Opción 2):
+3. **Configurar permisos de PowerShell** (Opción 2):
    ```powershell
    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
    ```
 
-3. **Crear estructura de carpetas:**
+4. **Crear estructura de carpetas:**
    ```
    C:\MisConsultas\
    ├── ejecutar_consultas_oracle.ps1
@@ -551,16 +707,16 @@ Nota: Se requiere Microsoft Excel instalado para exportar a XLSX
    └── resultados\
    ```
 
-4. **Agregar consultas SQL** en `C:\MisConsultas\consultas\`:
+5. **Agregar consultas SQL** en `C:\MisConsultas\consultas\`:
    - `ventas_mensuales.sql`
    - `top_clientes.sql`
    - `inventario_actual.sql`
 
-5. **Ejecutar el script:**
+6. **Ejecutar el script:**
    - Click derecho en `ejecutar_consultas_oracle.ps1`
    - "Ejecutar con PowerShell"
 
-6. **Ingresar datos:**
+7. **Ingresar datos:**
    ```
    Usuario: admin_ventas
    Contrasena: ************
@@ -570,7 +726,7 @@ Nota: Se requiere Microsoft Excel instalado para exportar a XLSX
    Formato: 1
    ```
 
-7. **Ver resultados** en `C:\MisConsultas\resultados\`:
+8. **Ver resultados** en `C:\MisConsultas\resultados\`:
    ```
    ventas_mensuales_20241217_150033.csv
    top_clientes_20241217_150033.csv
@@ -584,7 +740,7 @@ Nota: Se requiere Microsoft Excel instalado para exportar a XLSX
    inventario_actual_20241217_150033.xlsx
    ```
 
-8. **Opcional - Restaurar seguridad:**
+9. **Opcional - Restaurar seguridad:**
    ```powershell
    Set-ExecutionPolicy -ExecutionPolicy Restricted -Scope CurrentUser
    ```
@@ -595,10 +751,23 @@ Nota: Se requiere Microsoft Excel instalado para exportar a XLSX
 - Siga la sección **"Configuración de Permisos de PowerShell"**
 - Use el método de **Bypass** si no puede cambiar políticas
 
+### Java no funciona o no se encuentra
+- Verifique que instaló Java 17 o superior: `java -version`
+- Verifique JAVA_HOME: `echo $env:JAVA_HOME`
+- Verifique PATH: `echo $env:PATH` (debe contener `%JAVA_HOME%\bin`)
+- Abra una NUEVA ventana de PowerShell después de configurar variables
+- Si tiene múltiples versiones, asegúrese de que Java 17+ esté primero en PATH
+
 ### SQLcl no se encuentra
 - Verifique que extrajo SQLcl correctamente
 - Asegúrese de que `sql.exe` existe en `bin\`
+- Verifique que Java está funcionando antes de ejecutar SQLcl
 - Intente agregar la ruta al PATH del sistema
+
+### SQLcl no inicia (Error de Java)
+- Ejecute: `C:\oracle\sqlcl\bin\sql.exe -V`
+- Si falla, verifique que Java 17+ está instalado
+- Asegúrese de que JAVA_HOME apunta a una instalación válida de Java
 
 ### Problemas de conexión a Oracle
 - Verifique que el servidor Oracle esté accesible desde su red
@@ -615,7 +784,7 @@ Nota: Se requiere Microsoft Excel instalado para exportar a XLSX
 ### Consultas muy grandes
 - SQLcl puede tardar con consultas que devuelven muchos registros
 - El script mostrará el progreso en tiempo real
-- Espere a que termine el procesamiento
+-
 
 ### Formato CSV no se ve bien
 - Abra el CSV con un editor de texto primero
