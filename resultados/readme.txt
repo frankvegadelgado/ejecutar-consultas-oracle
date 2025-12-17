@@ -1,0 +1,1 @@
+Para convertir un archivo CSV a un libro de Excel, abralo con Microsoft Excel y guardelo en un formato de archivo de Excel (como .xlsx).

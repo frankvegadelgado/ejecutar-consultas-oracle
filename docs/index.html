@@ -1,0 +1,658 @@
+<html>
+
+<head>
+  <title>Ejecutor de Consultas</title>
+  <style>
+    body {
+      background-color: black;
+      color: white;
+    }
+
+    code:not(.language-diff) {
+      background-color: white;
+      color: black;
+      display: inline-block;
+    }
+
+    code.language-diff {
+      background-color: while;
+      color: green;
+    }
+  </style>
+</head>
+
+<body>
+<h1>Ejecutor de Consultas SQL para Oracle</h1>
+<p>Script automatizado en PowerShell para ejecutar múltiples consultas SQL en Oracle utilizando <strong>Oracle SQLcl</strong> y exportar los resultados a CSV o JSON.</p>
+<h2>📋 Requisitos Previos</h2>
+<h3>1. Sistema Operativo</h3>
+<ul>
+<li>Windows 10 o superior con PowerShell 5.1 o superior</li>
+</ul>
+<h3>2. PowerShell - Verificación de Versión</h3>
+<p>Para verificar su versión de PowerShell:</p>
+<ol>
+<li>Abra PowerShell (Inicio &gt; escriba &quot;PowerShell&quot;)</li>
+<li>Ejecute: <code>$PSVersionTable.PSVersion</code></li>
+<li>Debe mostrar versión 5.1 o superior</li>
+</ol>
+<h3>3. Oracle SQLcl</h3>
+<p><strong>Oracle SQLcl</strong> es la herramienta de línea de comandos moderna de Oracle que reemplaza a SQL*Plus. Es gratuita, ligera y no requiere instalación completa de Oracle Client.</p>
+<h4>¿Qué es SQLcl?</h4>
+<p>SQLcl (SQL Command Line) es:</p>
+<ul>
+<li>✅ Gratuito y de libre uso</li>
+<li>✅ Multiplataforma (Windows, Linux, Mac)</li>
+<li>✅ Moderno y con más funcionalidades que SQL*Plus</li>
+<li>✅ No requiere instalación de Oracle Client completo</li>
+<li>✅ Incluye soporte para JSON, CSV y otros formatos</li>
+<li>✅ Solo requiere Java (incluido en la descarga)</li>
+</ul>
+<h4>Descarga e Instalación de SQLcl</h4>
+<h5><strong>Paso 1: Descargar SQLcl</strong></h5>
+<ol>
+<li>Visite: <a href="https://www.oracle.com/database/sqldeveloper/technologies/sqlcl/download/">https://www.oracle.com/database/sqldeveloper/technologies/sqlcl/download/</a></li>
+<li>Descargue la versión más reciente (archivo <code>.zip</code>)</li>
+<li><strong>No requiere cuenta de Oracle</strong> para la descarga básica</li>
+</ol>
+<p><strong>Tamaño aproximado:</strong> 40-50 MB</p>
+<h5><strong>Paso 2: Instalar SQLcl</strong></h5>
+<ol>
+<li>
+<p><strong>Extraer el archivo ZIP:</strong></p>
+<ul>
+<li>Click derecho en el archivo descargado &gt; &quot;Extraer todo...&quot;</li>
+<li>Extraiga a una ubicación permanente, por ejemplo:
+<ul>
+<li><code>C:\oracle\sqlcl\</code></li>
+<li><code>C:\Program Files\Oracle\sqlcl\</code></li>
+<li><code>%USERPROFILE%\sqlcl\</code></li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>Estructura después de extraer:</strong></p>
+<pre><code>C:\oracle\sqlcl\
+├── bin\
+│   ├── sql.exe          ← Ejecutable principal
+│   └── sql.bat
+├── lib\
+└── LICENSE.txt
+</code></pre>
+</li>
+<li>
+<p><strong>Verificar Java (Incluido):</strong></p>
+<ul>
+<li>SQLcl incluye su propio Java Runtime</li>
+<li>No necesita instalar Java por separado</li>
+</ul>
+</li>
+</ol>
+<h5><strong>Paso 3: Verificar la Instalación</strong></h5>
+<p>Abra PowerShell o CMD y ejecute:</p>
+<p><strong>Opción A - Si está en PATH:</strong></p>
+<pre><code class="language-powershell">sql -V
+</code></pre>
+<p><strong>Opción B - Ruta completa:</strong></p>
+<pre><code class="language-powershell">C:\oracle\sqlcl\bin\sql.exe -V
+</code></pre>
+<p>Debería mostrar algo como:</p>
+<pre><code>SQLcl: Release 23.4 Production
+Build: 23.4.0.341.0944
+</code></pre>
+<h5><strong>Paso 4 (Opcional): Agregar SQLcl al PATH</strong></h5>
+<p>Para ejecutar <code>sql</code> desde cualquier ubicación:</p>
+<ol>
+<li>
+<p><strong>Abra &quot;Variables de entorno&quot;:</strong></p>
+<ul>
+<li>Presione <code>Win + R</code></li>
+<li>Escriba: <code>sysdm.cpl</code></li>
+<li>Click en &quot;Variables de entorno...&quot;</li>
+</ul>
+</li>
+<li>
+<p><strong>Editar PATH:</strong></p>
+<ul>
+<li>En &quot;Variables del sistema&quot;, busque <code>Path</code></li>
+<li>Click en &quot;Editar...&quot;</li>
+<li>Click en &quot;Nuevo&quot;</li>
+<li>Agregue: <code>C:\oracle\sqlcl\bin</code> (ajuste según su ruta)</li>
+<li>Click &quot;Aceptar&quot; en todas las ventanas</li>
+</ul>
+</li>
+<li>
+<p><strong>Verificar:</strong></p>
+<ul>
+<li>Abra una <strong>nueva</strong> ventana de PowerShell</li>
+<li>Ejecute: <code>sql -V</code></li>
+</ul>
+</li>
+</ol>
+<h4>Rutas Buscadas por el Script</h4>
+<p>El script buscará automáticamente SQLcl en:</p>
+<ul>
+<li><code>C:\oracle\sqlcl\bin\sql.exe</code></li>
+<li><code>C:\Program Files\Oracle\sqlcl\bin\sql.exe</code></li>
+<li><code>%USERPROFILE%\sqlcl\bin\sql.exe</code></li>
+<li><code>%ORACLE_HOME%\sqlcl\bin\sql.exe</code></li>
+<li>Variable <code>PATH</code> del sistema</li>
+</ul>
+<h2>🔐 Configuración de Permisos de PowerShell</h2>
+<h3>¿Por qué es necesario?</h3>
+<p>Por defecto, Windows <strong>bloquea la ejecución de scripts de PowerShell</strong> por seguridad. Debe otorgar permisos temporales para ejecutar este script.</p>
+<h3>Opción 1: Permitir Ejecución Temporal (Recomendado)</h3>
+<p>Esta opción permite ejecutar el script <strong>una sola vez</strong> sin cambiar la configuración del sistema:</p>
+<ol>
+<li><strong>Click derecho</strong> en el archivo <code>ejecutar_consultas_oracle.ps1</code></li>
+<li>Seleccione <strong>&quot;Ejecutar con PowerShell&quot;</strong></li>
+<li>Si aparece un mensaje de seguridad, seleccione <strong>&quot;Abrir&quot;</strong> o <strong>&quot;Ejecutar de todas formas&quot;</strong></li>
+</ol>
+<h3>Opción 2: Cambiar Política de Ejecución (Para Uso Frecuente)</h3>
+<p>Si planea ejecutar el script múltiples veces:</p>
+<h4><strong>Dar Permisos:</strong></h4>
+<ol>
+<li>
+<p><strong>Abra PowerShell como Administrador:</strong></p>
+<ul>
+<li>Presione <code>Win + X</code></li>
+<li>Seleccione <strong>&quot;Windows PowerShell (Administrador)&quot;</strong> o <strong>&quot;Terminal (Administrador)&quot;</strong></li>
+</ul>
+</li>
+<li>
+<p><strong>Ejecute el siguiente comando:</strong></p>
+<pre><code class="language-powershell">Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+</code></pre>
+</li>
+<li>
+<p><strong>Confirme con</strong> <code>S</code> (Sí) cuando se le pregunte</p>
+</li>
+<li>
+<p><strong>Cierre PowerShell</strong></p>
+</li>
+</ol>
+<p><strong>¿Qué hace esto?</strong></p>
+<ul>
+<li>Permite ejecutar scripts locales que usted mismo creó</li>
+<li>Mantiene protección contra scripts descargados sin firmar</li>
+<li>Solo afecta a su usuario, no a todo el sistema</li>
+</ul>
+<h4><strong>Verificar Política Actual:</strong></h4>
+<pre><code class="language-powershell">Get-ExecutionPolicy -List
+</code></pre>
+<p>Debería mostrar:</p>
+<pre><code>Scope          ExecutionPolicy
+-----          ---------------
+CurrentUser    RemoteSigned
+</code></pre>
+<h4><strong>Remover Permisos (Restaurar Seguridad Original):</strong></h4>
+<p>Una vez que termine de usar el script, puede restaurar la seguridad original:</p>
+<ol>
+<li>
+<p><strong>Abra PowerShell como Administrador</strong></p>
+</li>
+<li>
+<p><strong>Ejecute:</strong></p>
+<pre><code class="language-powershell">Set-ExecutionPolicy -ExecutionPolicy Restricted -Scope CurrentUser
+</code></pre>
+</li>
+<li>
+<p><strong>Confirme con</strong> <code>S</code> (Sí)</p>
+</li>
+</ol>
+<p><strong>Esto volverá a bloquear todos los scripts de PowerShell para mayor seguridad.</strong></p>
+<h3>Opción 3: Ejecución Bypass (Sin Cambiar Configuración)</h3>
+<p>Ejecutar el script <strong>sin modificar la política</strong> del sistema:</p>
+<ol>
+<li><strong>Abra PowerShell</strong> (no requiere administrador)</li>
+<li><strong>Navegue a la carpeta</strong> donde está el script:<pre><code class="language-powershell">cd &quot;C:\Ruta\A\Tu\Carpeta&quot;
+</code></pre>
+</li>
+<li><strong>Ejecute con bypass:</strong><pre><code class="language-powershell">powershell.exe -ExecutionPolicy Bypass -File .\ejecutar_consultas_oracle.ps1
+</code></pre>
+</li>
+</ol>
+<h2>🚀 Configuración del Proyecto</h2>
+<h3>Estructura de Carpetas</h3>
+<p>Antes de ejecutar el script, debe crear la siguiente estructura de carpetas en el mismo directorio donde se encuentra el archivo <code>.ps1</code>:</p>
+<pre><code>📁 [Directorio del Script]
+├── 📄 ejecutar_consultas_oracle.ps1
+├── 📁 consultas/
+│   ├── 📄 consulta1.sql
+│   ├── 📄 consulta2.sql
+│   └── 📄 ...
+└── 📁 resultados/
+    └── (aquí se guardarán los archivos generados)
+</code></pre>
+<h3>Crear las Carpetas</h3>
+<h4>Opción 1: Manualmente</h4>
+<ol>
+<li>Cree una carpeta llamada <code>consultas</code></li>
+<li>Cree una carpeta llamada <code>resultados</code></li>
+<li>Ambas deben estar en el mismo directorio que el archivo <code>.ps1</code></li>
+</ol>
+<h4>Opción 2: Desde PowerShell</h4>
+<pre><code class="language-powershell">New-Item -ItemType Directory -Name &quot;consultas&quot;
+New-Item -ItemType Directory -Name &quot;resultados&quot;
+</code></pre>
+<h4>Opción 3: Desde CMD</h4>
+<pre><code class="language-cmd">mkdir consultas
+mkdir resultados
+</code></pre>
+<h3>Preparar las Consultas SQL</h3>
+<ol>
+<li>Cree archivos con extensión <code>.sql</code> dentro de la carpeta <code>consultas</code></li>
+<li>Cada archivo debe contener una consulta SQL válida para Oracle</li>
+<li>Los nombres de archivo pueden contener espacios</li>
+<li><strong>NO incluya comandos SQLcl</strong> en sus archivos (como SET, SPOOL, EXIT) - el script los agrega automáticamente</li>
+</ol>
+<p><strong>Ejemplo de archivo SQL</strong> (<code>consultas/ventas_2024.sql</code>):</p>
+<pre><code class="language-sql">SELECT 
+    cliente_id,
+    nombre_cliente,
+    SUM(monto) as total_ventas
+FROM ventas
+WHERE fecha &gt;= TO_DATE('2024-01-01', 'YYYY-MM-DD')
+GROUP BY cliente_id, nombre_cliente
+ORDER BY total_ventas DESC;
+</code></pre>
+<p><strong>IMPORTANTE:</strong> Solo escriba la consulta SELECT (o DML). El script automáticamente agrega los comandos necesarios para formatear y exportar los resultados.</p>
+<h2>💻 Uso del Script</h2>
+<h3>Ejecutar el Script</h3>
+<h4>Método 1: Click Derecho (Más Simple)</h4>
+<ol>
+<li><strong>Click derecho</strong> en <code>ejecutar_consultas_oracle.ps1</code></li>
+<li>Seleccione <strong>&quot;Ejecutar con PowerShell&quot;</strong></li>
+<li>Se abrirá una ventana de PowerShell</li>
+</ol>
+<h4>Método 2: Desde PowerShell</h4>
+<ol>
+<li><strong>Abra PowerShell</strong></li>
+<li><strong>Navegue al directorio:</strong><pre><code class="language-powershell">cd &quot;C:\Ruta\Donde\Esta\El\Script&quot;
+</code></pre>
+</li>
+<li><strong>Ejecute:</strong><pre><code class="language-powershell">.\ejecutar_consultas_oracle.ps1
+</code></pre>
+</li>
+</ol>
+<h3>Datos de Entrada Requeridos</h3>
+<p>El script solicitará los siguientes datos <strong>uno por uno</strong>:</p>
+<h4>1. Usuario de Oracle</h4>
+<pre><code>Ingrese el usuario de Oracle: hr_user
+</code></pre>
+<ul>
+<li>Ingrese el nombre de usuario de su base de datos Oracle</li>
+<li>Presione <strong>ENTER</strong></li>
+</ul>
+<h4>2. Contraseña (Enmascarada)</h4>
+<pre><code>Ingrese la contrasena: ************
+</code></pre>
+<ul>
+<li>Ingrese la contraseña del usuario</li>
+<li><strong>La contraseña se oculta</strong> mientras escribe (muestra asteriscos)</li>
+<li>Presione <strong>ENTER</strong></li>
+</ul>
+<h4>3. Host</h4>
+<pre><code>Ingrese el host (ej: localhost): 192.168.1.100
+</code></pre>
+<ul>
+<li>Ingrese la dirección IP o nombre del servidor Oracle</li>
+<li>Ejemplos: <code>localhost</code>, <code>192.168.1.100</code>, <code>oracle.empresa.com</code></li>
+<li>Presione <strong>ENTER</strong></li>
+</ul>
+<h4>4. Puerto</h4>
+<pre><code>Ingrese el puerto (ej: 1521): 1521
+</code></pre>
+<ul>
+<li>Ingrese el puerto de conexión (por defecto Oracle usa <strong>1521</strong>)</li>
+<li><strong>Debe ser un número entre 1 y 65535</strong></li>
+<li>Presione <strong>ENTER</strong></li>
+</ul>
+<h4>5. SID o Service Name</h4>
+<pre><code>Ingrese el SID o Service Name: ORCL
+</code></pre>
+<ul>
+<li>Ingrese el SID o nombre del servicio de su base de datos</li>
+<li>Ejemplos: <code>ORCL</code>, <code>XE</code>, <code>PROD</code>, <code>pdborcl</code></li>
+<li>Presione <strong>ENTER</strong></li>
+</ul>
+<h4>6. Formato de Salida</h4>
+<pre><code>Formato de salida (1=CSV, 2=JSON) [Por defecto: 1]: 1
+</code></pre>
+<ul>
+<li>Ingrese <strong>1</strong> para exportar a CSV (predeterminado)</li>
+<li>Ingrese <strong>2</strong> para exportar a JSON</li>
+<li>Si presiona ENTER sin escribir nada, se usará CSV por defecto</li>
+</ul>
+<h3>Proceso de Ejecución</h3>
+<p>Una vez ingresados todos los datos:</p>
+<ol>
+<li>El script <strong>verifica</strong> la existencia de las carpetas <code>consultas</code> y <code>resultados</code></li>
+<li>Si faltan carpetas, muestra un error y espera que presione ENTER</li>
+<li>Busca la instalación de Oracle SQLcl en las rutas estándar</li>
+<li><strong>Valida la conexión</strong> a Oracle antes de procesar consultas</li>
+<li>Cuenta cuántos archivos <code>.sql</code> hay en la carpeta <code>consultas</code></li>
+<li><strong>Procesa cada consulta</strong> una por una:
+<ul>
+<li>Conecta a Oracle con las credenciales proporcionadas</li>
+<li>Ejecuta la consulta SQL</li>
+<li>Exporta los resultados con un nombre único</li>
+</ul>
+</li>
+<li>Muestra un resumen del procesamiento con colores</li>
+<li><strong>Siempre espera</strong> que presione ENTER antes de cerrar</li>
+</ol>
+<h3>Nombres de Archivos de Salida</h3>
+<p>Los archivos de resultados se guardan con el siguiente formato:</p>
+<pre><code>[nombre_consulta]_[fecha]_[hora].[extensión]
+</code></pre>
+<p><strong>Ejemplos:</strong></p>
+<ul>
+<li><code>ventas_2024_20241217_143055.csv</code></li>
+<li><code>clientes_activos_20241217_144512.json</code></li>
+</ul>
+<p>Esto permite:</p>
+<ul>
+<li>Identificar fácilmente qué consulta generó el resultado</li>
+<li>Mantener un historial de ejecuciones</li>
+<li>Evitar sobrescribir archivos anteriores</li>
+<li>Timestamp con segundos para mayor precisión</li>
+</ul>
+<h2>⚠️ Manejo de Errores con Try/Catch/Finally</h2>
+<p>El script utiliza el sistema <strong>nativo de PowerShell</strong> para manejo de errores:</p>
+<h3>Try Block</h3>
+<p>Contiene toda la lógica principal del script</p>
+<h3>Catch Block</h3>
+<p>Captura <strong>cualquier error</strong> que ocurra y muestra:</p>
+<ul>
+<li>Mensaje de error crítico</li>
+<li>Detalles del error específico</li>
+<li>Estado final del script</li>
+</ul>
+<h3>Finally Block</h3>
+<p><strong>SIEMPRE se ejecuta</strong>, sin importar si hubo error o no:</p>
+<ul>
+<li>Muestra mensaje de cierre</li>
+<li><strong>Espera ENTER antes de cerrar</strong></li>
+<li>Garantiza que la ventana no se cierre abruptamente</li>
+</ul>
+<h2>❌ Errores Comunes</h2>
+<h3>El script NO se cierra automáticamente en caso de error</h3>
+<p>Todos los errores mostrarán un mensaje descriptivo y <strong>siempre</strong> esperarán que presione <strong>ENTER</strong> para cerrar la ventana.</p>
+<h3>Errores de Validación</h3>
+<h4>Error: Campo vacío</h4>
+<pre><code>[ERROR] El usuario no puede estar vacio
+</code></pre>
+<p><strong>Solución:</strong> Ingrese un valor válido</p>
+<h4>Error: Puerto inválido</h4>
+<pre><code>[ERROR] El puerto debe ser un numero valido
+</code></pre>
+<p><strong>Solución:</strong> Ingrese solo números (ejemplo: 1521)</p>
+<pre><code>[ERROR] El puerto debe estar entre 1 y 65535
+</code></pre>
+<p><strong>Solución:</strong> Ingrese un puerto en el rango válido</p>
+<h3>Errores de Configuración</h3>
+<h4>Error: Carpeta &quot;consultas&quot; no encontrada</h4>
+<pre><code>[ERROR] No se encontro la carpeta 'consultas'
+
+Por favor, cree la carpeta 'consultas' en el mismo directorio donde esta este script
+y coloque sus archivos .sql dentro de ella.
+</code></pre>
+<p><strong>Solución:</strong> Cree la carpeta <code>consultas</code> y vuelva a ejecutar el script.</p>
+<h4>Error: Carpeta &quot;resultados&quot; no encontrada</h4>
+<pre><code>[ERROR] No se encontro la carpeta 'resultados'
+
+Por favor, cree la carpeta 'resultados' en el mismo directorio donde esta este script.
+Esta carpeta se utilizara para guardar los resultados de las consultas.
+</code></pre>
+<p><strong>Solución:</strong> Cree la carpeta <code>resultados</code> y vuelva a ejecutar el script.</p>
+<h4>Error: Oracle SQLcl no encontrado</h4>
+<pre><code>[ERROR] No se pudo encontrar Oracle SQLcl instalado
+
+Rutas buscadas:
+  - C:\oracle\sqlcl\bin\sql.exe
+  - C:\Program Files\Oracle\sqlcl\bin\sql.exe
+  - %USERPROFILE%\sqlcl\bin\sql.exe
+  - %ORACLE_HOME%\sqlcl\bin\sql.exe
+  - Variable PATH del sistema
+
+Por favor, descargue e instale Oracle SQLcl desde:
+https://www.oracle.com/database/sqldeveloper/technologies/sqlcl/download/
+</code></pre>
+<p><strong>Solución:</strong> Descargue e instale Oracle SQLcl siguiendo las instrucciones de este README.</p>
+<h3>Errores de Conexión</h3>
+<h4>Error: No se puede conectar a Oracle</h4>
+<pre><code>[ERROR] No se pudo establecer conexion con Oracle
+
+Verifique los siguientes datos:
+  - Usuario: admin_ventas
+  - Host: db-server.empresa.com
+  - Puerto: 1521
+  - SID/Service: PRODDB
+
+Posibles causas:
+  - Credenciales incorrectas
+  - Servidor Oracle no accesible
+  - Firewall bloqueando la conexion
+  - SID o Service Name incorrecto
+</code></pre>
+<p><strong>Soluciones:</strong></p>
+<ol>
+<li>Verifique que las credenciales sean correctas</li>
+<li>Pruebe hacer ping al servidor: <code>ping db-server.empresa.com</code></li>
+<li>Verifique que el firewall permita conexiones al puerto Oracle</li>
+<li>Confirme el SID/Service Name correcto con el administrador de BD</li>
+<li>Intente conectarse manualmente con SQLcl:<pre><code>sql usuario/password@host:puerto/servicio
+</code></pre>
+</li>
+</ol>
+<h4>Advertencia: No hay archivos SQL</h4>
+<pre><code>[ADVERTENCIA] No se encontraron archivos .sql en la carpeta 'consultas'
+
+Por favor, agregue sus consultas SQL en la carpeta 'consultas' y vuelva a ejecutar el script.
+</code></pre>
+<p><strong>Solución:</strong> Agregue al menos un archivo <code>.sql</code> en la carpeta <code>consultas</code>.</p>
+<h3>Errores Durante Ejecución</h3>
+<h4>Error al ejecutar consulta específica</h4>
+<pre><code>Procesando: consulta_invalida.sql
+  &gt; Salida: consulta_invalida_20241217_1430.csv
+  [ERROR] Fallo la ejecucion de la consulta
+  Detalles: ORA-00942: table or view does not exist
+</code></pre>
+<p><strong>Posibles causas:</strong></p>
+<ul>
+<li>Sintaxis SQL incorrecta</li>
+<li>Tabla o columna no existe</li>
+<li>Permisos insuficientes sobre objetos de BD</li>
+<li>Consulta demasiado larga (timeout)</li>
+</ul>
+<p><strong>Solución:</strong></p>
+<ul>
+<li>Pruebe la consulta manualmente en SQLcl primero</li>
+<li>Revise los permisos del usuario en Oracle</li>
+<li>Simplifique consultas muy complejas</li>
+</ul>
+<h2>📊 Ejemplo Completo de Uso</h2>
+<h3>Paso a Paso</h3>
+<ol>
+<li>
+<p><strong>Descargar e instalar Oracle SQLcl</strong></p>
+<ul>
+<li>Descargue desde: https://www.oracle.com/database/sqldeveloper/technologies/sqlcl/download/</li>
+<li>Extraiga a <code>C:\oracle\sqlcl\</code></li>
+</ul>
+</li>
+<li>
+<p><strong>Configurar permisos de PowerShell</strong> (Opción 2):</p>
+<pre><code class="language-powershell">Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+</code></pre>
+</li>
+<li>
+<p><strong>Crear estructura de carpetas:</strong></p>
+<pre><code>C:\MisConsultas\
+├── ejecutar_consultas_oracle.ps1
+├── consultas\
+└── resultados\
+</code></pre>
+</li>
+<li>
+<p><strong>Agregar consultas SQL</strong> en <code>C:\MisConsultas\consultas\</code>:</p>
+<ul>
+<li><code>ventas_mensuales.sql</code></li>
+<li><code>top_clientes.sql</code></li>
+<li><code>inventario_actual.sql</code></li>
+</ul>
+</li>
+<li>
+<p><strong>Ejecutar el script:</strong></p>
+<ul>
+<li>Click derecho en <code>ejecutar_consultas_oracle.ps1</code></li>
+<li>&quot;Ejecutar con PowerShell&quot;</li>
+</ul>
+</li>
+<li>
+<p><strong>Ingresar datos:</strong></p>
+<pre><code>Usuario: admin_ventas
+Contrasena: ************
+Host: db-server.empresa.com
+Puerto: 1521
+SID/Service: PRODDB
+Formato: 1
+</code></pre>
+</li>
+<li>
+<p><strong>Ver resultados</strong> en <code>C:\MisConsultas\resultados\</code>:</p>
+<pre><code>ventas_mensuales_20241217_150033.csv
+top_clientes_20241217_150033.csv
+inventario_actual_20241217_150033.csv
+</code></pre>
+</li>
+<li>
+<p><strong>Opcional - Restaurar seguridad:</strong></p>
+<pre><code class="language-powershell">Set-ExecutionPolicy -ExecutionPolicy Restricted -Scope CurrentUser
+</code></pre>
+</li>
+</ol>
+<h2>🔧 Solución de Problemas</h2>
+<h3>El script no se ejecuta (Error de Política)</h3>
+<ul>
+<li>Siga la sección <strong>&quot;Configuración de Permisos de PowerShell&quot;</strong></li>
+<li>Use el método de <strong>Bypass</strong> si no puede cambiar políticas</li>
+</ul>
+<h3>SQLcl no se encuentra</h3>
+<ul>
+<li>Verifique que extrajo SQLcl correctamente</li>
+<li>Asegúrese de que <code>sql.exe</code> existe en <code>bin\</code></li>
+<li>Intente agregar la ruta al PATH del sistema</li>
+</ul>
+<h3>Problemas de conexión a Oracle</h3>
+<ul>
+<li>Verifique que el servidor Oracle esté accesible desde su red</li>
+<li>Pruebe la conexión manualmente con SQLcl primero:<pre><code>sql usuario/password@host:puerto/servicio
+</code></pre>
+</li>
+<li>Verifique configuraciones de firewall y TNS</li>
+</ul>
+<h3>Archivos con espacios en el nombre</h3>
+<ul>
+<li>PowerShell y SQLcl manejan correctamente nombres con espacios</li>
+<li>No es necesario renombrar archivos</li>
+</ul>
+<h3>Consultas muy grandes</h3>
+<ul>
+<li>SQLcl puede tardar con consultas que devuelven muchos registros</li>
+<li>El script mostrará el progreso en tiempo real</li>
+<li>Espere a que termine el procesamiento</li>
+</ul>
+<h3>Formato CSV no se ve bien</h3>
+<ul>
+<li>Abra el CSV con un editor de texto primero</li>
+<li>Asegúrese de que su Excel esté configurado para UTF-8</li>
+<li>Use &quot;Importar datos&quot; en Excel en lugar de doble click</li>
+</ul>
+<h3>La ventana se cierra inmediatamente</h3>
+<ul>
+<li><strong>Nunca debería ocurrir</strong> gracias al bloque <code>finally</code></li>
+<li>Si ocurre, ejecute desde PowerShell directamente para ver el error</li>
+</ul>
+<h2>🎨 Características del Script PowerShell</h2>
+<h3>Ventajas de Usar SQLcl</h3>
+<p>✅ <strong>Gratuito y ligero</strong> - No requiere Oracle Client completo<br>
+✅ <strong>Multiplataforma</strong> - Funciona en Windows, Linux, Mac<br>
+✅ <strong>Formatos modernos</strong> - CSV, JSON, HTML, XML<br>
+✅ <strong>Rápido y eficiente</strong> - Mejor rendimiento que SQL*Plus<br>
+✅ <strong>Actualizado</strong> - Soporta las últimas versiones de Oracle<br>
+✅ <strong>Sin instalación compleja</strong> - Solo extraer y usar</p>
+<h3>Ventajas del Script PowerShell</h3>
+<p>✅ <strong>Try/Catch/Finally nativo</strong> - Manejo robusto de errores<br>
+✅ <strong>Validación de tipos</strong> - Puerto debe ser número<br>
+✅ <strong>Colores en consola</strong> - Mejor experiencia visual<br>
+✅ <strong>Mejor manejo de strings</strong> - Sin problemas con espacios<br>
+✅ <strong>Objetos y propiedades</strong> - Código más limpio<br>
+✅ <strong>Contraseña enmascarada</strong> - Mayor seguridad</p>
+<h3>Colores Utilizados</h3>
+<ul>
+<li><strong>Cyan</strong>: Títulos y encabezados</li>
+<li><strong>Yellow</strong>: Advertencias y configuración</li>
+<li><strong>Green</strong>: Éxito y confirmaciones</li>
+<li><strong>Red</strong>: Errores críticos</li>
+<li><strong>Gray</strong>: Información secundaria</li>
+<li><strong>White</strong>: Información principal</li>
+</ul>
+<h2>📝 Notas Adicionales</h2>
+<ul>
+<li>El script utiliza codificación <strong>UTF-8</strong> para soportar caracteres especiales</li>
+<li>Cada ejecución del script es independiente (no guarda estado entre ejecuciones)</li>
+<li>Los archivos de resultados <strong>nunca se sobrescriben</strong> gracias al timestamp único con segundos</li>
+<li>Se recomienda <strong>probar las consultas manualmente</strong> en SQLcl antes de usar el script</li>
+<li>El script es compatible con <strong>Oracle 11g, 12c, 18c, 19c, 21c y 23c</strong></li>
+<li>PowerShell 5.1 viene <strong>preinstalado</strong> en Windows 10 y 11</li>
+<li>SQLcl requiere Java, pero viene incluido en el paquete</li>
+</ul>
+<h2>🔒 Seguridad y Mejores Prácticas</h2>
+<h3>Recomendaciones de Seguridad</h3>
+<ol>
+<li>
+<p><strong>Credenciales:</strong></p>
+<ul>
+<li>Nunca guarde contraseñas en el script</li>
+<li>La contraseña se enmascara automáticamente durante la entrada</li>
+<li>Considere usar Oracle Wallet para credenciales frecuentes</li>
+</ul>
+</li>
+<li>
+<p><strong>Permisos de PowerShell:</strong></p>
+<ul>
+<li>Use <code>RemoteSigned</code> en lugar de <code>Unrestricted</code></li>
+<li>Restaure a <code>Restricted</code> cuando termine de usar el script</li>
+</ul>
+</li>
+<li>
+<p><strong>Consultas SQL:</strong></p>
+<ul>
+<li>Revise todas las consultas antes de ejecutarlas</li>
+<li>Evite consultas con <code>DELETE</code> o <code>UPDATE</code> sin <code>WHERE</code></li>
+<li>Use permisos de solo lectura cuando sea posible</li>
+<li>No incluya credenciales en los archivos .sql</li>
+</ul>
+</li>
+<li>
+<p><strong>Red:</strong></p>
+<ul>
+<li>Use conexiones seguras (Oracle Advanced Security)</li>
+<li>Considere VPN para conexiones remotas</li>
+<li>Verifique configuraciones de firewall</li>
+</ul>
+</li>
+</ol>
+<h2>📄 Licencia</h2>
+<p>Este script es de uso libre. Oracle SQLcl está bajo licencia Oracle Technology Network License Agreement.</p>
+<h2>🤝 Contribuciones</h2>
+<p>Para reportar problemas o sugerir mejoras, por favor contacte al desarrollador del proyecto.</p>
+<hr>
+<p><strong>Versión del Script:</strong> 3.0 (PowerShell + Oracle SQLcl)<br>
+<strong>Fecha:</strong> Diciembre 2024<br>
+<strong>Compatible con:</strong> Oracle SQLcl 23.x+, Windows 10+, PowerShell 5.1+, Oracle 11g-23c</p>
+</body>
+</html>
