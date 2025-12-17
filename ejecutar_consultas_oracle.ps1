@@ -451,13 +451,7 @@ call sql.exe %*
     # Crear script temporal para probar conexion
     $testScript = Join-Path $env:TEMP "test_connection_$(Get-Random).sql"
     @"
-SET ECHO OFF
-SET FEEDBACK OFF
-SET HEADING OFF
-SET TIMING OFF
-SET TERMOUT OFF
 SELECT 'CONNECTION_OK' FROM DUAL;
-EXIT;
 "@ | Out-File -FilePath $testScript -Encoding UTF8
 
     # Intentar conexion con timeout usando el wrapper
