@@ -1,7 +1,7 @@
 # ========================================
 # Ejecutor de Consultas SQL - Oracle
-# Oracle SQLcl
-# PowerShell Script
+# Oracle SQLcl con exportacion a CSV y Excel
+# PowerShell Script usando Microsoft Excel
 # ========================================
 
 # Configurar codificacion UTF-8 para la consola
@@ -19,10 +19,35 @@ try {
 # Limpiar pantalla para refrescar la codificacion
 Clear-Host
 
+# Funcion para verificar si Excel esta instalado
+function Test-ExcelInstalled {
+    try {
+        # Intentar crear objeto Excel
+        $excel = New-Object -ComObject "Excel.Application" -ErrorAction Stop
+        $version = $excel.Version
+        $excel.Quit()
+        [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
+        [System.GC]::Collect()
+        [System.GC]::WaitForPendingFinalizers()
+        
+        # Convertir version a numero para validar
+        $versionNum = [double]$version
+        if ($versionNum -ge 12) { # Excel 2007 o superior
+            return $true, $version
+        } else {
+            return $false, $version
+        }
+    }
+    catch {
+        return $false, $null
+    }
+}
+
 try {
     Write-Host "========================================" -ForegroundColor Cyan
     Write-Host " Ejecutor de Consultas SQL - Oracle" -ForegroundColor Cyan
-    Write-Host " Oracle SQLcl" -ForegroundColor Cyan
+    Write-Host " Oracle SQLcl con exportacion a CSV/Excel" -ForegroundColor Cyan
+    Write-Host " Usando Microsoft Excel para conversion" -ForegroundColor Cyan
     Write-Host "========================================" -ForegroundColor Cyan
     Write-Host ""
 
@@ -108,11 +133,30 @@ try {
             $extension = "csv"
             $formato = "csv"
             $formatoDisplay = "CSV"
+            $exportarExcel = $false
         }
         elseif ($tipoSalida -eq "2") {
             $extension = "xlsx"
             $formato = "xlsx"
             $formatoDisplay = "XLSX (Excel)"
+            $exportarExcel = $true
+            
+            # Verificar si Excel esta instalado
+            $excelInfo = Test-ExcelInstalled
+            if (-not $excelInfo[0]) {
+                Write-Host "[ERROR] Microsoft Excel no esta instalado o es anterior a 2007" -ForegroundColor Red
+                if ($excelInfo[1]) {
+                    Write-Host "Version encontrada: $($excelInfo[1]) (se requiere Excel 2007 o superior)" -ForegroundColor Yellow
+                } else {
+                    Write-Host "Microsoft Excel no fue encontrado en el sistema" -ForegroundColor Yellow
+                }
+                Write-Host ""
+                Write-Host "Por favor, instale Microsoft Excel 2007 o superior para usar esta funcion." -ForegroundColor Yellow
+                Write-Host "Puede seleccionar la opcion 1 para exportar a CSV en lugar de Excel." -ForegroundColor Yellow
+                throw "Microsoft Excel no disponible"
+            }
+            
+            Write-Host "[OK] Microsoft Excel $($excelInfo[1]) detectado" -ForegroundColor Green
         }
         else {
             Write-Host "[ERROR] Opcion invalida. Debe ser 1 o 2" -ForegroundColor Red
@@ -309,15 +353,11 @@ EXIT;
         Write-Host "Procesando: $nombreArchivo" -ForegroundColor White
         Write-Host "  > Salida: $archivoSalida" -ForegroundColor Gray
         
-        # Crear script temporal con comandos SQLcl
-        $wrapperScript = Join-Path $env:TEMP "wrapper_$(Get-Random).sql"
+        # Crear archivo temporal para el CSV (siempre se exporta primero a CSV)
+        $archivoTempCsv = Join-Path $env:TEMP "${nombreBase}_${timestamp}_temp.csv"
         
-        # SQLcl solo soporta CSV nativamente, para XLSX exportamos primero a CSV
-        $rutaCsvTemporal = if ($formato -eq "xlsx") {
-            Join-Path $env:TEMP "temp_$(Get-Random).csv"
-        } else {
-            $rutaSalida
-        }
+        # Crear script temporal con comandos SQLcl para exportar a CSV
+        $wrapperScript = Join-Path $env:TEMP "wrapper_$(Get-Random).sql"
         
         @"
 SET ECHO OFF
@@ -326,7 +366,7 @@ SET PAGESIZE 0
 SET LINESIZE 32767
 SET TRIMSPOOL ON
 SET SQLFORMAT csv
-SPOOL $rutaCsvTemporal
+SPOOL $archivoTempCsv
 @"$($archivo.FullName)"
 SPOOL OFF
 EXIT;
@@ -351,17 +391,126 @@ EXIT;
         # Limpiar script temporal
         Remove-Item $wrapperScript -ErrorAction SilentlyContinue
 
-        if ($queryProcess.ExitCode -eq 0 -and (Test-Path $rutaSalida)) {
-            Write-Host "  [OK] Consulta ejecutada correctamente" -ForegroundColor Green
-            $procesados++
-        }
-        else {
+        # Verificar si la consulta se ejecuto correctamente
+        if ($queryProcess.ExitCode -ne 0 -or -not (Test-Path $archivoTempCsv)) {
             Write-Host "  [ERROR] Fallo la ejecucion de la consulta" -ForegroundColor Red
             if ($queryStderr) {
-                Write-Host "  Detalles: $($queryStderr.Substring(0, [Math]::Min(100, $queryStderr.Length)))" -ForegroundColor DarkRed
+                Write-Host "  Detalles: $($queryStderr.Trim().Substring(0, [Math]::Min(200, $queryStderr.Length)))" -ForegroundColor DarkRed
             }
             $errores++
+            Write-Host ""
+            continue
         }
+
+        # Verificar que el CSV no este vacio o solo contenga encabezados
+        $csvContent = Get-Content $archivoTempCsv -Raw
+        $lineas = $csvContent -split "`n" | Where-Object { $_.Trim() -ne "" }
+        
+        if ($lineas.Count -le 1) {
+            Write-Host "  [ADVERTENCIA] La consulta no devolvio datos o solo contiene encabezados" -ForegroundColor Yellow
+            Remove-Item $archivoTempCsv -ErrorAction SilentlyContinue
+            $procesados++
+            Write-Host ""
+            continue
+        }
+
+        try {
+            if ($exportarExcel) {
+                # Exportar a Excel (XLSX) usando Microsoft Excel
+                Write-Host "  > Convirtiendo CSV a Excel usando Microsoft Office..." -ForegroundColor Gray
+                
+                # Crear objeto Excel
+                $excel = New-Object -ComObject "Excel.Application"
+                $excel.Visible = $false
+                $excel.DisplayAlerts = $false
+                $excel.ScreenUpdating = $false
+                $excel.AskToUpdateLinks = $false
+                
+                try {
+                    # Abrir el archivo CSV
+                    Write-Host "  > Abriendo CSV en Excel..." -ForegroundColor Gray
+                    $workbook = $excel.Workbooks.Open($archivoTempCsv)
+                    
+                    # Aplicar formato basico
+                    $worksheet = $workbook.Worksheets.Item(1)
+                    
+                    # Autoajustar columnas
+                    $usedRange = $worksheet.UsedRange
+                    $usedRange.EntireColumn.AutoFit() | Out-Null
+                    
+                    # Formato de tabla (solo Excel 2007+)
+                    $listObject = $worksheet.ListObjects.Add(
+                        [Microsoft.Office.Interop.Excel.XlListObjectSourceType]::xlSrcRange,
+                        $usedRange,
+                        $null,
+                        [Microsoft.Office.Interop.Excel.XlYesNoGuess]::xlYes
+                    )
+                    
+                    # Aplicar estilo de tabla (estilo 6 es uno basico)
+                    $listObject.TableStyle = "TableStyleMedium2"
+                    
+                    # Congelar paneles (primera fila)
+                    $worksheet.Activate()
+                    $excel.ActiveWindow.SplitRow = 1
+                    $excel.ActiveWindow.FreezePanes = $true
+                    
+                    # Guardar como XLSX
+                    Write-Host "  > Guardando como XLSX..." -ForegroundColor Gray
+                    
+                    # Formato XLSX (51 = xlOpenXMLWorkbook - .xlsx)
+                    $xlFileFormat = 51
+                    
+                    $workbook.SaveAs($rutaSalida, $xlFileFormat)
+                    
+                    Write-Host "  [OK] Archivo Excel generado: $archivoSalida" -ForegroundColor Green
+                }
+                catch {
+                    Write-Host "  [ERROR] Error al convertir a Excel: $($_.Exception.Message)" -ForegroundColor Red
+                    throw
+                }
+                finally {
+                    # Cerrar todo correctamente
+                    if ($workbook) {
+                        try { $workbook.Close($false) } catch {}
+                        [System.Runtime.Interopservices.Marshal]::ReleaseComObject($workbook) | Out-Null
+                    }
+                    
+                    $excel.Quit()
+                    [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
+                    [System.GC]::Collect()
+                    [System.GC]::WaitForPendingFinalizers()
+                    
+                    # Matar procesos de Excel residuales
+                    Get-Process excel -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+                }
+            }
+            else {
+                # Solo CSV - mover el archivo temporal a la ubicacion final
+                Move-Item -Path $archivoTempCsv -Destination $rutaSalida -Force
+                Write-Host "  [OK] Archivo CSV generado: $archivoSalida" -ForegroundColor Green
+            }
+            
+            $procesados++
+        }
+        catch {
+            Write-Host "  [ERROR] Error al procesar los datos: $($_.Exception.Message)" -ForegroundColor Red
+            
+            # Si fallo la conversion a Excel, guardar como CSV como respaldo
+            if ($exportarExcel -and (Test-Path $archivoTempCsv)) {
+                $backupCsv = Join-Path $dirResultados "${nombreBase}_${timestamp}_backup.csv"
+                Move-Item -Path $archivoTempCsv -Destination $backupCsv -Force
+                Write-Host "  [INFO] Datos guardados como CSV de respaldo: $(Split-Path $backupCsv -Leaf)" -ForegroundColor Yellow
+            }
+            
+            $errores++
+        }
+        finally {
+            # Limpiar archivo temporal si existe
+            if (Test-Path $archivoTempCsv) {
+                Remove-Item $archivoTempCsv -ErrorAction SilentlyContinue
+            }
+        }
+        
         Write-Host ""
     }
 
@@ -383,10 +532,21 @@ EXIT;
         Write-Host "  - Las credenciales de conexion"
         Write-Host "  - La sintaxis de las consultas SQL"
         Write-Host "  - La conectividad con el servidor Oracle"
+        Write-Host "  - Que Excel no este bloqueado por otro proceso"
         Write-Host ""
     }
 
     Write-Host "Resultados guardados en: $dirResultados" -ForegroundColor Cyan
+    
+    if ($exportarExcel -and $procesados -gt 0) {
+        Write-Host ""
+        Write-Host "[INFO] Archivos Excel generados con las siguientes caracteristicas:" -ForegroundColor Cyan
+        Write-Host "  - Tabla formateada con estilo profesional" -ForegroundColor Gray
+        Write-Host "  - Encabezados congelados para facil navegacion" -ForegroundColor Gray
+        Write-Host "  - Columnas autoajustadas al contenido" -ForegroundColor Gray
+        Write-Host "  - Formato XLSX compatible con Excel 2007+" -ForegroundColor Gray
+    }
+    
     Write-Host ""
     Write-Host "========================================" -ForegroundColor Green
     Write-Host "Script finalizado exitosamente" -ForegroundColor Green
@@ -404,6 +564,9 @@ catch {
     Write-Host ""
     Write-Host "Detalles del error:" -ForegroundColor Yellow
     Write-Host $_.Exception.Message -ForegroundColor Red
+    if ($_.ScriptStackTrace) {
+        Write-Host "Trace: $($_.ScriptStackTrace)" -ForegroundColor DarkGray
+    }
     Write-Host ""
     Write-Host "========================================" -ForegroundColor Red
     Write-Host "El script finalizo con errores" -ForegroundColor Red
