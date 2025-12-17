@@ -651,5 +651,5 @@ Para reportar problemas o sugerir mejoras, por favor contacte al desarrollador d
 ---
 
 **Versión del Script:** 3.0 (PowerShell + Oracle SQLcl)  
-**Fecha:** Diciembre 2024  
+**Fecha:** Diciembre 2025  
 **Compatible con:** Oracle SQLcl 23.x+, Windows 10+, PowerShell 5.1+, Oracle 11g-23c
