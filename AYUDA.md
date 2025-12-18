@@ -76,11 +76,11 @@ Build: 23.4.0.341.0944
 
 **ANTES de ejecutar el programa, DEBE crear estas carpetas:**
 
-En el mismo directorio donde está `ejecutar_consultas_oracle.exe`, cree:
+En el mismo directorio donde está `ejecutar_consultas.exe`, cree:
 
 ```
 📁 [Directorio del Proyecto]
-├── 📄 ejecutar_consultas_oracle.exe
+├── 📄 ejecutar_consultas.exe
 ├── 📁 consultas/          ← CREAR ESTA CARPETA
 │   └── (aquí se colocan los archivos .sql)
 └── 📁 resultados/         ← CREAR ESTA CARPETA
@@ -104,7 +104,7 @@ mkdir resultados
 ## 💻 Uso del Programa
 
 ### Ejecutar el Programa
-1. **Doble clic** en `ejecutar_consultas_oracle.exe`
+1. **Doble clic** en `ejecutar_consultas.exe`
 2. Se abrirá una ventana de consola
 
 ### Datos de Entrada Requeridos
