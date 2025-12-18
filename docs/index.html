@@ -370,11 +370,21 @@ WHERE departamento = '&amp;departamento'
 <li><strong>Mensajes claros:</strong> Informa exactamente qué operación no permitida se detectó</li>
 <li><strong>Compatibilidad:</strong> Permite <code>WITH</code> (CTE) y consultas complejas válidas</li>
 </ul>
-<h3>💾 Compilación a Ejecutable (.exe)</h3>
-<p>El script puede convertirse a un archivo ejecutable autónomo:</p>
-<h4>Comando de Compilación:</h4>
-<pre><code class="language-powershell">ps2exe -inputFile .\ejecutar_consultas_oracle.ps1 -outputFile .\ejecutar_consultas_oracle.exe -title &quot;Ejecutor de Consultas Oracle&quot; -version &quot;1.0.0.0&quot; -requireAdmin
+<h2>💾 Compilación a Ejecutable (.exe)</h2>
+<h3><strong>Instalación del Compilador (ya incluida en install.ps1)</strong></h3>
+<p>El archivo <code>install.ps1</code> contiene:</p>
+<pre><code class="language-powershell">Install-Module -Name ps2exe -Scope CurrentUser
 </code></pre>
+<h3><strong>Archivo de Compilación (executable.ps1)</strong></h3>
+<p>El archivo <code>executable.ps1</code> ya contiene el comando de compilación:</p>
+<pre><code class="language-powershell"># Este archivo crea el ejecutable
+ps2exe -inputFile .\ejecutar_consultas_oracle.ps1 -outputFile .\ejecutar_consultas.exe -title &quot;Ejecutor de Consultas Oracle&quot; -version &quot;1.0.0.0&quot; -requireAdmin
+</code></pre>
+<h3><strong>Proceso Simplificado</strong></h3>
+<ol>
+<li><strong>Ya ejecutaste</strong> <code>install.ps1</code> → ps2exe está instalado</li>
+<li><strong>Ejecuta</strong> <code>executable.ps1</code> → Genera el archivo .exe</li>
+</ol>
 <h4>Características del Ejecutable:</h4>
 <ul>
 <li><strong>Parámetros preconfigurados:</strong> Incluye contraseña por defecto</li>
@@ -382,6 +392,7 @@ WHERE departamento = '&amp;departamento'
 <li><strong>Compatibilidad:</strong> Funciona en cualquier sistema sin requisitos especiales</li>
 <li><strong>Seguridad:</strong> Mantiene todas las validaciones del script original</li>
 </ul>
+<p><strong>Solo necesitas ejecutar:</strong> <code>.\executable.ps1</code></p>
 <h2>🔐 Configuración de Permisos de PowerShell</h2>
 <h3>¿Por qué es necesario?</h3>
 <p>Por defecto, Windows <strong>bloquea la ejecución de scripts de PowerShell</strong> por seguridad. Debe otorgar permisos temporales para ejecutar este script.</p>
@@ -551,7 +562,7 @@ WHERE departamento = '&amp;departamento'
 </ol>
 <h4>Método 3: Ejecutable Compilado (.exe)</h4>
 <ol>
-<li><strong>Doble click</strong> en <code>ejecutar_consultas_oracle.exe</code></li>
+<li><strong>Doble click</strong> en <code>ejecutar_consultas.exe</code></li>
 </ol>
 <h3>Datos de Entrada Requeridos</h3>
 <p>El script solicitará los siguientes datos <strong>uno por uno</strong>:</p>

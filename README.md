@@ -318,20 +318,33 @@ WHERE departamento = '&departamento'
 - **Mensajes claros:** Informa exactamente qué operación no permitida se detectó
 - **Compatibilidad:** Permite `WITH` (CTE) y consultas complejas válidas
 
-### 💾 Compilación a Ejecutable (.exe)
+## 💾 Compilación a Ejecutable (.exe)
 
-El script puede convertirse a un archivo ejecutable autónomo:
-
-#### Comando de Compilación:
+### **Instalación del Compilador (ya incluida en install.ps1)**
+El archivo `install.ps1` contiene:
 ```powershell
-ps2exe -inputFile .\ejecutar_consultas_oracle.ps1 -outputFile .\ejecutar_consultas_oracle.exe -title "Ejecutor de Consultas Oracle" -version "1.0.0.0" -requireAdmin
+Install-Module -Name ps2exe -Scope CurrentUser
 ```
+
+### **Archivo de Compilación (executable.ps1)**
+El archivo `executable.ps1` ya contiene el comando de compilación:
+
+```powershell
+# Este archivo crea el ejecutable
+ps2exe -inputFile .\ejecutar_consultas_oracle.ps1 -outputFile .\ejecutar_consultas.exe -title "Ejecutor de Consultas Oracle" -version "1.0.0.0" -requireAdmin
+```
+
+### **Proceso Simplificado**
+1. **Ya ejecutaste** `install.ps1` → ps2exe está instalado
+2. **Ejecuta** `executable.ps1` → Genera el archivo .exe
 
 #### Características del Ejecutable:
 - **Parámetros preconfigurados:** Incluye contraseña por defecto
 - **Sin necesidad de PowerShell:** Ejecutable nativo de Windows
 - **Compatibilidad:** Funciona en cualquier sistema sin requisitos especiales
 - **Seguridad:** Mantiene todas las validaciones del script original
+
+**Solo necesitas ejecutar:** `.\executable.ps1`
 
 ## 🔐 Configuración de Permisos de PowerShell
 
@@ -524,7 +537,7 @@ departamento;fecha_minima
    ```
 
 #### Método 3: Ejecutable Compilado (.exe)
-1. **Doble click** en `ejecutar_consultas_oracle.exe`
+1. **Doble click** en `ejecutar_consultas.exe`
  
 ### Datos de Entrada Requeridos
 
