@@ -334,7 +334,7 @@ try {
         }
         
         if ($opcionContrasena -eq "1") {
-            # Usar contrasena por defecto 'caca' (pasada como parametro o valor por defecto)
+            # Usar contrasena por defecto (pasada como parametro o valor por defecto)
             Write-Host "[OK] Usando contrasena por defecto" -ForegroundColor Green
         }
         elseif ($opcionContrasena -eq "2") {
@@ -572,7 +572,7 @@ REM Cambiar al directorio de SQLcl
 cd /d "$sqlclDir"
 
 REM Ejecutar SQLcl con los argumentos pasados - path entre comillas
-call "sql.exe" %*
+call sql.exe %*
 "@ | Out-File -FilePath $sqlclBatPath -Encoding ASCII
 
     Write-Host "[OK] Wrapper creado para evitar warnings de Java" -ForegroundColor Green
@@ -659,15 +659,20 @@ call "sql.exe" %*
         # Crear script temporal con comandos SQLcl para exportar a CSV
         $wrapperScript = Join-Path $env:TEMP "wrapper_$(Get-Random).sql"
         
-        # Crear contenido del script SQL
+        # Leer el contenido del archivo SQL
+        $sqlQueryContent = Get-Content $archivo.FullName -Raw
+
+        # Crear contenido del script SQL optimizado para CSV
         $sqlContent = @"
 SET ECHO OFF
 SET FEEDBACK OFF
+SET VERIFY OFF
+SET HEADING ON
 SET PAGESIZE 0
 SET LINESIZE 32767
 SET TRIMSPOOL ON
-SET SQLFORMAT csv
 SET TERMOUT OFF
+SET SQLFORMAT csv
 "@
 
         # Agregar definicion de variables si hay parametros
@@ -680,9 +685,11 @@ SET TERMOUT OFF
             }
         }
 
+        # Agregar el contenido SQL directamente con terminador de ejecucion
         $sqlContent += @"
 `nSPOOL "$archivoTempCsv"
-@"$($archivo.FullName)"
+$sqlQueryContent
+/
 SPOOL OFF
 EXIT;
 "@
