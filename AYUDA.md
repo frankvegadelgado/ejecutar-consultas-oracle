@@ -18,7 +18,7 @@ java -version
 Si muestra un error o una versión menor a 17, necesita instalar Java.
 
 #### Paso 2: Instalar Java (Oracle JDK)
-1. Visite: **https://www.oracle.com/java/technologies/downloads/**
+1. Visite: [https://www.oracle.com/java/technologies/downloads/](https://www.oracle.com/java/technologies/downloads/)
 2. Descargue **Java 17 o superior** (versión LTS)
 3. Ejecute el instalador `.exe` descargado
 4. Siga el asistente de instalación completo
@@ -41,7 +41,7 @@ Java(TM) SE Runtime Environment (build 17.0.9+11-LTS-201)
 **DEBE instalar Oracle SQLcl para que el programa funcione.**
 
 #### Paso 1: Descargar Oracle SQLcl
-1. Visite: **https://www.oracle.com/database/sqldeveloper/technologies/sqlcl/download/**
+1. Visite: [https://www.oracle.com/database/sqldeveloper/technologies/sqlcl/download/](https://www.oracle.com/database/sqldeveloper/technologies/sqlcl/download/)
 2. Descargue la versión más reciente (archivo `.zip`)
 
 #### Paso 2: Instalar Oracle SQLcl
