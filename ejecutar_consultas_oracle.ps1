@@ -317,7 +317,7 @@ try {
     } while ([string]::IsNullOrWhiteSpace($usuario))
 
     # Contrasena - manejo por parametro o entrada interactiva
-    $password = "Laudate Dominum"
+    $password = "Laudate Dominum"  # <- Cambie esta contraseña por la que necesite
     
     Write-Host ""
     Write-Host "Opciones de contrasena:" -ForegroundColor Yellow
@@ -568,6 +568,9 @@ REM Configurar variables de entorno para evitar warnings de Java 17+
 set JAVA_TOOL_OPTIONS=-Duser.language=en -Duser.country=US
 set JDK_JAVA_OPTIONS=--add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --enable-native-access=ALL-UNNAMED
 
+REM Para la codificacion
+set NLS_LANG=SPANISH_SPAIN.AL32UTF8
+
 REM Cambiar al directorio de SQLcl
 cd /d "$sqlclDir"
 
@@ -689,7 +692,6 @@ SET SQLFORMAT csv
         $sqlContent += @"
 `nSPOOL "$archivoTempCsv"
 $sqlQueryContent
-/
 SPOOL OFF
 EXIT;
 "@
@@ -763,8 +765,20 @@ EXIT;
 
         try {
             if ($exportarExcel) {
-                # Exportar a Excel (XLSX) usando Microsoft Excel
-                Write-Host "  > Convirtiendo CSV a Excel usando Microsoft Office..." -ForegroundColor Gray
+                # Exportar a Excel (XLSX) usando el método de importación de texto
+                Write-Host "  > Convirtiendo CSV a Excel usando importación de texto..." -ForegroundColor Gray
+                
+                # **SOLUCIÓN: Leer el CSV con codificación UTF-8 y guardar con BOM para Excel**
+                Write-Host "  > Preparando archivo CSV con codificación UTF-8..." -ForegroundColor Gray
+                
+                # Leer el CSV con UTF-8
+                $reader = New-Object System.IO.StreamReader($archivoTempCsv, [System.Text.Encoding]::UTF8)
+                $csvContentUtf8 = $reader.ReadToEnd()
+                $reader.Close()
+                
+                # Guardar temporalmente con UTF-8 BOM para Excel
+                $archivoTempCsvUtf8 = "$archivoTempCsv.utf8"
+                [System.IO.File]::WriteAllText($archivoTempCsvUtf8, $csvContentUtf8, [System.Text.Encoding]::UTF8)
                 
                 # Crear objeto Excel
                 $excel = New-Object -ComObject "Excel.Application"
@@ -774,27 +788,69 @@ EXIT;
                 $excel.AskToUpdateLinks = $false
                 
                 try {
-                    # Abrir el archivo CSV
-                    Write-Host "  > Abriendo CSV en Excel..." -ForegroundColor Gray
-                    $workbook = $excel.Workbooks.Open($archivoTempCsv)
+                    Write-Host "  > Importando datos con codificación UTF-8..." -ForegroundColor Gray
                     
-                    # Aplicar formato basico
+                    # Crear nuevo libro
+                    $workbook = $excel.Workbooks.Add()
                     $worksheet = $workbook.Worksheets.Item(1)
                     
-                    # Autoajustar columnas
-                    $usedRange = $worksheet.UsedRange
-                    $usedRange.EntireColumn.AutoFit() | Out-Null
-                    
-                    # Formato de tabla (solo Excel 2007+)
-                    $listObject = $worksheet.ListObjects.Add(
-                        [Microsoft.Office.Interop.Excel.XlListObjectSourceType]::xlSrcRange,
-                        $usedRange,
-                        $null,
-                        [Microsoft.Office.Interop.Excel.XlYesNoGuess]::xlYes
+                    # Importar datos desde CSV usando QueryTables (maneja mejor UTF-8)
+                    $queryTable = $worksheet.QueryTables.Add(
+                        "TEXT;$archivoTempCsvUtf8",
+                        $worksheet.Range("A1")
                     )
+                    $queryTable.Name = "DataImport"
+                    $queryTable.FieldNames = $true
+                    $queryTable.RowNumbers = $false
+                    $queryTable.FillAdjacentFormulas = $false
+                    $queryTable.PreserveFormatting = $true
+                    $queryTable.RefreshOnFileOpen = $false
+                    $queryTable.RefreshStyle = 1  # xlInsertDeleteCells
+                    $queryTable.SavePassword = $false
+                    $queryTable.SaveData = $true
+                    $queryTable.AdjustColumnWidth = $true
+                    $queryTable.RefreshPeriod = 0
+                    $queryTable.TextFilePlatform = 65001  # UTF-8
+                    $queryTable.TextFileStartRow = 1
+                    $queryTable.TextFileParseType = 1      # xlDelimited
+                    $queryTable.TextFileTextQualifier = 1  # xlTextQualifierDoubleQuote
+                    $queryTable.TextFileConsecutiveDelimiter = $false
+                    $queryTable.TextFileTabDelimiter = $false
+                    $queryTable.TextFileSemicolonDelimiter = $false
+                    $queryTable.TextFileCommaDelimiter = $true
+                    $queryTable.TextFileSpaceDelimiter = $false
                     
-                    # Aplicar estilo de tabla (estilo 6 es uno basico)
-                    $listObject.TableStyle = "TableStyleMedium2"
+                    # Configurar todas las columnas como texto para preservar caracteres
+                    $columnCount = ($csvContentUtf8 -split "`n")[0].Split(',').Count
+                    $dataTypes = @()
+                    for ($i = 0; $i -lt $columnCount; $i++) {
+                        $dataTypes += 2  # 2 = xlTextFormat
+                    }
+                    $queryTable.TextFileColumnDataTypes = $dataTypes
+                    
+                    $queryTable.TextFileTrailingMinusNumbers = $true
+                    $queryTable.Refresh($false)
+                    
+                    # Eliminar el QueryTable después de importar
+                    $queryTable.Delete()
+                    
+                    # Autoajustar columnas
+                    $worksheet.UsedRange.EntireColumn.AutoFit() | Out-Null
+                    
+                    # Aplicar formato de tabla (opcional)
+                    try {
+                        $usedRange = $worksheet.UsedRange
+                        $listObject = $worksheet.ListObjects.Add(
+                            [Microsoft.Office.Interop.Excel.XlListObjectSourceType]::xlSrcRange,
+                            $usedRange,
+                            $null,
+                            [Microsoft.Office.Interop.Excel.XlYesNoGuess]::xlYes
+                        )
+                        $listObject.TableStyle = "TableStyleMedium2"
+                    }
+                    catch {
+                        Write-Host "  [INFO] No se pudo aplicar formato de tabla (puede ser por datos muy grandes)" -ForegroundColor Gray
+                    }
                     
                     # Congelar paneles (primera fila)
                     $worksheet.Activate()
@@ -813,7 +869,7 @@ EXIT;
                     
                     # Mostrar warnings si los hubo durante la consulta
                     if ($filteredQueryStderr -and $filteredQueryStderr.Trim() -ne "") {
-                        Write-Host "  [INFO] Nota: Se ignoraron warnings de Java durante la ejecucion" -ForegroundColor Gray
+                        Write-Host "  [INFO] Se ignoraron warnings de Java durante la ejecución" -ForegroundColor Gray
                     }
                 }
                 catch {
@@ -834,18 +890,28 @@ EXIT;
                     [System.GC]::Collect()
                     [System.GC]::WaitForPendingFinalizers()
                     
+                    # Limpiar archivo temporal UTF-8
+                    if (Test-Path $archivoTempCsvUtf8) {
+                        Remove-Item $archivoTempCsvUtf8 -ErrorAction SilentlyContinue
+                    }
+                    
                     # Matar procesos de Excel residuales
                     Get-Process excel -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
                 }
             }
             else {
-                # Solo CSV - mover el archivo temporal a la ubicacion final
-                Move-Item -Path $archivoTempCsv -Destination $rutaSalida -Force
+                # Solo CSV - asegurar UTF-8 con BOM
+                Write-Host "  > Guardando CSV con codificación UTF-8..." -ForegroundColor Gray
+                
+                # **SOLUCIÓN: Leer y escribir con UTF-8 BOM explícito**
+                $csvContent = [System.IO.File]::ReadAllText($archivoTempCsv, [System.Text.Encoding]::UTF8)
+                [System.IO.File]::WriteAllText($rutaSalida, $csvContent, [System.Text.Encoding]::UTF8)
+                
                 Write-Host "  [OK] Archivo CSV generado: $archivoSalida" -ForegroundColor Green
                 
                 # Mostrar warnings si los hubo durante la consulta
                 if ($filteredQueryStderr -and $filteredQueryStderr.Trim() -ne "") {
-                    Write-Host "  [INFO] Nota: Se ignoraron warnings de Java durante la ejecucion" -ForegroundColor Gray
+                    Write-Host "  [INFO] Se ignoraron warnings de Java durante la ejecución" -ForegroundColor Gray
                 }
             }
             

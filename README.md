@@ -538,6 +538,14 @@ Ingrese el usuario de Oracle: hr_user
 - Presione **ENTER**
 
 #### 2. Contraseña (Sistema Mejorado)
+
+**Nota importante:** Si desea usar la opción por defecto (opción 1), debe configurar la contraseña por defecto editando la siguiente línea en el script:
+
+```powershell
+# Contrasena - manejo por parametro o entrada interactiva
+$password = "Laudate Dominum"  # <- Cambie esta contraseña por la que necesite
+```
+
 ```
 Opciones de contrasena:
   1. Usar contrasena por defecto (RECOMENDADO)
