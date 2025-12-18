@@ -1,0 +1,1 @@
+ps2exe -inputFile .\ejecutar_consultas.ps1 -outputFile .\ejecutar_consultas.exe -title "Ejecutor de Consultas Oracle" -version "1.0.0.0" -requireAdmin

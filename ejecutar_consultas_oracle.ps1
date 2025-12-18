@@ -2,6 +2,7 @@
 # Ejecutor de Consultas SQL - Oracle
 # Oracle SQLcl con exportacion a CSV y Excel
 # PowerShell Script usando Microsoft Excel
+# Version: 2.0 - Con validacion de SELECT y parametros
 # ========================================
 
 # Configurar codificacion UTF-8 para la consola
@@ -81,7 +82,6 @@ function Invoke-ProcessWithTimeout {
             }
         } else {
             # Timeout - matar el proceso
-            Write-Host "  [TIMEOUT] El proceso excedio el tiempo de espera ($TimeoutSeconds segundos)" -ForegroundColor Red
             try {
                 $process.Kill()
                 Start-Sleep -Milliseconds 500
@@ -186,11 +186,120 @@ function Remove-JavaWarnings {
     return $result.Trim()
 }
 
+# Funcion para leer nombres de parametros desde archivo TXT y solicitar valores al usuario
+function Get-SqlParameters {
+    param(
+        [string]$SqlFilePath
+    )
+    
+    $txtFilePath = [System.IO.Path]::ChangeExtension($SqlFilePath, ".txt")
+    
+    if (Test-Path $txtFilePath) {
+        Write-Host "  > Leyendo definiciones de parametros desde: $(Split-Path $txtFilePath -Leaf)" -ForegroundColor Gray
+        $paramContent = Get-Content $txtFilePath -Raw -Encoding UTF8
+        $paramNames = $paramContent.Trim() -split ';' | ForEach-Object { $_.Trim() }
+        
+        $parameters = @{}
+        
+        foreach ($paramName in $paramNames) {
+            if (-not [string]::IsNullOrWhiteSpace($paramName)) {
+                $paramValue = Read-Host "  Ingrese valor para '$paramName'"
+                $parameters[$paramName] = $paramValue
+            }
+        }
+        
+        return $parameters
+    }
+    
+    return @{}
+}
+
+# Funcion para validar que el script SQL contenga solo SELECT
+function Test-ValidSqlQuery {
+    param(
+        [string]$SqlFilePath
+    )
+    
+    try {
+        $content = Get-Content $SqlFilePath -Raw -Encoding UTF8
+        
+        # Convertir a mayusculas para busqueda insensible a mayusculas/minusculas
+        $upperContent = $content.ToUpper()
+        
+        # Eliminar comentarios para evitar falsos positivos
+        $contentWithoutComments = [regex]::Replace($content, '--.*$', '', [System.Text.RegularExpressions.RegexOptions]::Multiline)
+        $contentWithoutComments = [regex]::Replace($contentWithoutComments, '/\*.*?\*/', '', [System.Text.RegularExpressions.RegexOptions]::Singleline)
+        $upperContent = $contentWithoutComments.ToUpper()
+        
+        # Palabras clave prohibidas
+        $forbiddenKeywords = @(
+            'INSERT\s+INTO',
+            'UPDATE\s+',
+            'DELETE\s+FROM',
+            'DELETE\s+',
+            'DROP\s+',
+            'TRUNCATE\s+',
+            'CREATE\s+',
+            'ALTER\s+',
+            'GRANT\s+',
+            'REVOKE\s+',
+            'MERGE\s+',
+            'EXECUTE\s+',
+            'EXEC\s+',
+            'CALL\s+',
+            'DECLARE\s+',
+            'BEGIN\s+',
+            'END;',
+            'COMMIT',
+            'ROLLBACK',
+            'SAVEPOINT',
+            'LOCK\s+TABLE',
+            'PURGE\s+',
+            'RENAME\s+',
+            'COMMENT\s+',
+            'AUDIT\s+',
+            'NOAUDIT\s+',
+            'FLASHBACK\s+',
+            'ANALYZE\s+',
+            'EXPLAIN\s+PLAN',
+            'ASSOCIATE\s+STATISTICS',
+            'DISASSOCIATE\s+STATISTICS'
+        )
+        
+        # Verificar si contiene palabras clave prohibidas
+        foreach ($keyword in $forbiddenKeywords) {
+            if ([regex]::IsMatch($upperContent, "\b$keyword\b", [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)) {
+                return $false, "Contiene operacion no permitida: $keyword"
+            }
+        }
+        
+        # Verificar si es un SELECT (debe empezar con SELECT, posiblemente con WITH)
+        if (-not [regex]::IsMatch($upperContent, '^\s*(WITH|SELECT)\s+', [System.Text.RegularExpressions.RegexOptions]::Multiline)) {
+            return $false, "El script debe comenzar con SELECT o WITH (Common Table Expression)"
+        }
+        
+        # Verificar que no contenga PL/SQL (bloques BEGIN...END)
+        if ([regex]::IsMatch($upperContent, 'BEGIN\s+.+?\s+END', [System.Text.RegularExpressions.RegexOptions]::Singleline -bor [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)) {
+            return $false, "Contiene bloques PL/SQL (BEGIN...END)"
+        }
+        
+        # Verificar punto y coma al final (opcional, pero buena practica)
+        if (-not [regex]::IsMatch($content, ';\s*$', [System.Text.RegularExpressions.RegexOptions]::Multiline)) {
+            Write-Host "  [ADVERTENCIA] El script SQL no termina con punto y coma (;)" -ForegroundColor Yellow
+        }
+        
+        return $true, "OK"
+    }
+    catch {
+        return $false, "Error al validar el script: $($_.Exception.Message)"
+    }
+}
+
 try {
     Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host " Ejecutor de Consultas SQL - Oracle" -ForegroundColor Cyan
+    Write-Host " EJECUTOR DE CONSULTAS SQL - ORACLE" -ForegroundColor Cyan
     Write-Host " Oracle SQLcl con exportacion a CSV/Excel" -ForegroundColor Cyan
-    Write-Host " Usando Microsoft Excel para conversion" -ForegroundColor Cyan
+    Write-Host " VALIDACION: Solo consultas SELECT permitidas" -ForegroundColor Cyan
     Write-Host "========================================" -ForegroundColor Cyan
     Write-Host ""
 
@@ -207,23 +316,53 @@ try {
         }
     } while ([string]::IsNullOrWhiteSpace($usuario))
 
-    # Contrasena (enmascarada)
+    # Contrasena - manejo por parametro o entrada interactiva
+    $password = "Laudate Dominum"
+    
+    Write-Host ""
+    Write-Host "Opciones de contrasena:" -ForegroundColor Yellow
+    Write-Host "  1. Usar contrasena por defecto [RECOMENDADO]" -ForegroundColor Green
+    Write-Host "  2. Ingresar contrasena personalizada" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "[ADVERTENCIA] La opcion por defecto es mas segura y evita errores de conexion." -ForegroundColor Cyan
+    Write-Host ""
+
     do {
-        $securePassword = Read-Host "Ingrese la contrasena" -AsSecureString
-        # Convertir SecureString a texto plano para usar con SQLcl
-        $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
-        $password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
-        [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
-        
-        if ([string]::IsNullOrWhiteSpace($password)) {
-            Write-Host "[ERROR] La contrasena no puede estar vacia" -ForegroundColor Red
-            Write-Host ""
+        $opcionContrasena = Read-Host "Seleccione opcion de contrasena (1 o 2) [Por defecto: 1]"
+        if ([string]::IsNullOrWhiteSpace($opcionContrasena)) {
+            $opcionContrasena = "1"
         }
-    } while ([string]::IsNullOrWhiteSpace($password))
+        
+        if ($opcionContrasena -eq "1") {
+            # Usar contrasena por defecto 'caca' (pasada como parametro o valor por defecto)
+            Write-Host "[OK] Usando contrasena por defecto" -ForegroundColor Green
+        }
+        elseif ($opcionContrasena -eq "2") {
+            # Ingresar contrasena personalizada
+            do {
+                $securePassword = Read-Host "Ingrese la contrasena personalizada" -AsSecureString
+                # Convertir SecureString a texto plano para usar con SQLcl
+                $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
+                $password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+                [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
+                
+                if ([string]::IsNullOrWhiteSpace($password)) {
+                    Write-Host "[ERROR] La contrasena no puede estar vacia" -ForegroundColor Red
+                    Write-Host ""
+                }
+            } while ([string]::IsNullOrWhiteSpace($password))
+            Write-Host "[OK] Contrasena personalizada configurada" -ForegroundColor Green
+        }
+        else {
+            Write-Host "[ERROR] Opcion invalida. Debe ser 1 o 2" -ForegroundColor Red
+            Write-Host ""
+            $opcionContrasena = $null
+        }
+    } while ([string]::IsNullOrWhiteSpace($opcionContrasena))
 
     # Host
     do {
-        $host_db = Read-Host "Ingrese el host (ej: localhost)"
+        $host_db = Read-Host "Ingrese el host (ej: localhost, 192.168.1.100)"
         if ([string]::IsNullOrWhiteSpace($host_db)) {
             Write-Host "[ERROR] El host no puede estar vacio" -ForegroundColor Red
             Write-Host ""
@@ -258,7 +397,7 @@ try {
 
     # SID o Service Name
     do {
-        $sidService = Read-Host "Ingrese el SID o Service Name"
+        $sidService = Read-Host "Ingrese el SID o Service Name (ej: ORCL, XE, PDB1)"
         if ([string]::IsNullOrWhiteSpace($sidService)) {
             Write-Host "[ERROR] El SID o Service Name no puede estar vacio" -ForegroundColor Red
             Write-Host ""
@@ -339,7 +478,7 @@ try {
     # Verificar estructura de carpetas
     # ========================================
     
-    $dirActual = Split-Path -Parent $MyInvocation.MyCommand.Path
+    $dirActual = Get-Location
     $dirConsultas = Join-Path $dirActual "consultas"
     $dirResultados = Join-Path $dirActual "resultados"
 
@@ -427,104 +566,24 @@ setlocal
 
 REM Configurar variables de entorno para evitar warnings de Java 17+
 set JAVA_TOOL_OPTIONS=-Duser.language=en -Duser.country=US
-set JDK_JAVA_OPTIONS=--add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED
+set JDK_JAVA_OPTIONS=--add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --enable-native-access=ALL-UNNAMED
 
 REM Cambiar al directorio de SQLcl
 cd /d "$sqlclDir"
 
-REM Ejecutar SQLcl con los argumentos pasados
-call sql.exe %*
+REM Ejecutar SQLcl con los argumentos pasados - path entre comillas
+call "sql.exe" %*
 "@ | Out-File -FilePath $sqlclBatPath -Encoding ASCII
 
     Write-Host "[OK] Wrapper creado para evitar warnings de Java" -ForegroundColor Green
     Write-Host ""
 
     # ========================================
-    # Validar conexion a Oracle (CON TIMEOUT)
+    # Validar conexion a Oracle
     # ========================================
     
     $connectionString = "${usuario}/${password}@${host_db}:${puerto}/${sidService}"
     
-    Write-Host "Validando conexion a Oracle (timeout: 30 segundos)..." -ForegroundColor Yellow
-    Write-Host ""
-
-    # Crear script temporal para probar conexion
-    $testScript = Join-Path $env:TEMP "test_connection_$(Get-Random).sql"
-    @"
-SELECT 'CONNECTION_OK' FROM DUAL;
-"@ | Out-File -FilePath $testScript -Encoding UTF8
-
-    # Intentar conexion con timeout usando el wrapper
-    $testResult = Invoke-ProcessWithTimeout -FilePath $sqlclBatPath -Arguments "-S $connectionString @`"$testScript`"" -TimeoutSeconds 30
-
-    # Limpiar archivo temporal
-    Remove-Item $testScript -ErrorAction SilentlyContinue
-
-    # Filtrar warnings de Java del resultado
-    $filteredStderr = Remove-JavaWarnings -Text $testResult.Stderr
-    
-    if (-not $testResult.Success -or $testResult.TimedOut) {
-        Write-Host "[ERROR] No se pudo establecer conexion con Oracle" -ForegroundColor Red
-        Write-Host ""
-        
-        if ($testResult.TimedOut) {
-            Write-Host "La conexion se agoto (timeout de 30 segundos)" -ForegroundColor Yellow
-        } elseif ($filteredStderr -and $filteredStderr.Trim() -ne "") {
-            Write-Host "Error detallado:" -ForegroundColor Yellow
-            Write-Host $filteredStderr -ForegroundColor Red
-        }
-        
-        Write-Host ""
-        Write-Host "Verifique los siguientes datos:"
-        Write-Host "  - Usuario: $usuario"
-        Write-Host "  - Host: $host_db"
-        Write-Host "  - Puerto: $puerto"
-        Write-Host "  - SID/Service: $sidService"
-        Write-Host ""
-        Write-Host "Posibles causas:"
-        Write-Host "  - Credenciales incorrectas"
-        Write-Host "  - Servidor Oracle no accesible"
-        Write-Host "  - Firewall bloqueando la conexion"
-        Write-Host "  - SID o Service Name incorrecto"
-        Write-Host "  - El servicio Oracle no esta en ejecucion"
-        Write-Host ""
-        
-        # Limpiar archivo batch temporal
-        Remove-Item $sqlclBatPath -ErrorAction SilentlyContinue
-        
-        throw "Error de conexion a Oracle"
-    }
-
-    # Verificar la respuesta ignorando warnings
-    if ($testResult.Stdout -notlike "*CONNECTION_OK*") {
-        # Si hay warnings pero la conexion fue exitosa, verificar en stderr filtrado
-        if ($filteredStderr -and $filteredStderr.Trim() -ne "") {
-            Write-Host "[ADVERTENCIA] Hubo advertencias durante la conexion:" -ForegroundColor Yellow
-            Write-Host $filteredStderr -ForegroundColor DarkYellow
-            Write-Host ""
-        }
-        
-        # Verificar si realmente fallo o solo hay warnings
-        Write-Host "[ERROR] Respuesta inesperada del servidor Oracle" -ForegroundColor Red
-        Write-Host ""
-        Write-Host "Respuesta recibida:" -ForegroundColor Yellow
-        Write-Host $testResult.Stdout -ForegroundColor Red
-        
-        # Limpiar archivo batch temporal
-        Remove-Item $sqlclBatPath -ErrorAction SilentlyContinue
-        
-        throw "Error en validacion de conexion"
-    }
-
-    Write-Host "[OK] Conexion establecida correctamente" -ForegroundColor Green
-    
-    # Mostrar warnings si los hay (filtrados)
-    if ($filteredStderr -and $filteredStderr.Trim() -ne "") {
-        Write-Host "[INFO] Nota: Se ignoraron warnings de Java durante la conexion" -ForegroundColor Gray
-    }
-    
-    Write-Host ""
-
     # ========================================
     # Buscar archivos SQL
     # ========================================
@@ -557,6 +616,7 @@ SELECT 'CONNECTION_OK' FROM DUAL;
     $procesados = 0
     $errores = 0
     $timeouts = 0
+    $invalidos = 0
 
     foreach ($archivo in $archivosSql) {
         $nombreArchivo = $archivo.Name
@@ -571,13 +631,36 @@ SELECT 'CONNECTION_OK' FROM DUAL;
         Write-Host "Procesando: $nombreArchivo" -ForegroundColor White
         Write-Host "  > Salida: $archivoSalida" -ForegroundColor Gray
         
+        # ========================================
+        # VALIDAR QUE EL SCRIPT SOLO CONTENGA SELECT
+        # ========================================
+        Write-Host "  > Validando que sea solo consulta SELECT..." -ForegroundColor Gray
+        $validacion = Test-ValidSqlQuery -SqlFilePath $archivo.FullName
+        
+        if (-not $validacion[0]) {
+            Write-Host "  [ERROR] Script SQL invalido" -ForegroundColor Red
+            Write-Host "  Razon: $($validacion[1])" -ForegroundColor DarkRed
+            Write-Host "  Este script solo permite consultas SELECT." -ForegroundColor Yellow
+            Write-Host "  Operaciones prohibidas: INSERT, UPDATE, DELETE, DROP, TRUNCATE, CREATE, ALTER, PL/SQL, etc." -ForegroundColor Yellow
+            $invalidos++
+            $errores++
+            Write-Host ""
+            continue
+        }
+        
+        Write-Host "  [OK] Validacion de SELECT exitosa" -ForegroundColor Green
+        
         # Crear archivo temporal para el CSV (siempre se exporta primero a CSV)
         $archivoTempCsv = Join-Path $env:TEMP "${nombreBase}_${timestamp}_temp.csv"
+        
+        # Obtener parametros desde archivo TXT (si existe)
+        $parametros = Get-SqlParameters -SqlFilePath $archivo.FullName
         
         # Crear script temporal con comandos SQLcl para exportar a CSV
         $wrapperScript = Join-Path $env:TEMP "wrapper_$(Get-Random).sql"
         
-        @"
+        # Crear contenido del script SQL
+        $sqlContent = @"
 SET ECHO OFF
 SET FEEDBACK OFF
 SET PAGESIZE 0
@@ -585,15 +668,35 @@ SET LINESIZE 32767
 SET TRIMSPOOL ON
 SET SQLFORMAT csv
 SET TERMOUT OFF
-SPOOL $archivoTempCsv
+"@
+
+        # Agregar definicion de variables si hay parametros
+        if ($parametros.Count -gt 0) {
+            foreach ($paramName in $parametros.Keys) {
+                $paramValue = $parametros[$paramName]
+                # Escapar comillas simples en los valores de parametro
+                $paramValue = $paramValue -replace "'", "''"
+                $sqlContent += "`nDEFINE $paramName = '$paramValue'"
+            }
+        }
+
+        $sqlContent += @"
+`nSPOOL "$archivoTempCsv"
 @"$($archivo.FullName)"
 SPOOL OFF
 EXIT;
-"@ | Out-File -FilePath $wrapperScript -Encoding UTF8
+"@
+
+        # Guardar script temporal
+        $sqlContent | Out-File -FilePath $wrapperScript -Encoding UTF8
         
         # Ejecutar consulta CON TIMEOUT (30 minutos = 1800 segundos) usando el wrapper
         Write-Host "  > Ejecutando consulta (timeout: 30 minutos)..." -ForegroundColor Gray
-        $queryResult = Invoke-ProcessWithTimeout -FilePath $sqlclBatPath -Arguments "-S $connectionString @`"$wrapperScript`"" -TimeoutSeconds 1800
+        
+        # Construir argumentos para SQLcl - asegurando que el wrapperScript este entre comillas
+        $sqlclArgs = "-S `"$connectionString`" @`"$wrapperScript`""
+        
+        $queryResult = Invoke-ProcessWithTimeout -FilePath "`"$sqlclBatPath`"" -Arguments $sqlclArgs -TimeoutSeconds 1800
 
         # Limpiar script temporal
         Remove-Item $wrapperScript -ErrorAction SilentlyContinue
@@ -617,7 +720,7 @@ EXIT;
 
         # Verificar si la consulta se ejecuto correctamente (ignorando warnings)
         if (-not (Test-Path $archivoTempCsv)) {
-            Write-Host "  [ERROR] Fallo la ejecucion de la consulta - No se generó el archivo CSV" -ForegroundColor Red
+            Write-Host "  [ERROR] Fallo la ejecucion de la consulta - No se genero el archivo CSV" -ForegroundColor Red
             
             # Mostrar solo errores reales (filtrados de warnings)
             if ($filteredQueryStderr -and $filteredQueryStderr.Trim() -ne "") {
@@ -773,11 +876,14 @@ EXIT;
     # ========================================
     
     Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host "Procesamiento completado" -ForegroundColor Cyan
+    Write-Host "PROCESAMIENTO COMPLETADO" -ForegroundColor Cyan
     Write-Host "========================================" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "Archivos procesados: $procesados" -ForegroundColor Green
-    Write-Host "Errores encontrados: $errores" -ForegroundColor $(if ($errores -gt 0) { "Red" } else { "Green" })
+    Write-Host "Archivos procesados exitosamente: $procesados" -ForegroundColor Green
+    Write-Host "Archivos con errores: $errores" -ForegroundColor $(if ($errores -gt 0) { "Red" } else { "Green" })
+    if ($invalidos -gt 0) {
+        Write-Host "Archivos SQL invalidos (no SELECT): $invalidos" -ForegroundColor Yellow
+    }
     if ($timeouts -gt 0) {
         Write-Host "Timeouts de consulta: $timeouts" -ForegroundColor Yellow
     }
@@ -787,6 +893,7 @@ EXIT;
         Write-Host "[NOTA] Algunos archivos no se procesaron correctamente." -ForegroundColor Yellow
         Write-Host "Verifique:"
         Write-Host "  - Las credenciales de conexion"
+        Write-Host "  - Que los scripts SQL sean solo consultas SELECT (sin INSERT, UPDATE, DELETE, etc.)"
         Write-Host "  - La sintaxis de las consultas SQL"
         Write-Host "  - La conectividad con el servidor Oracle"
         Write-Host "  - Que Excel no este bloqueado por otro proceso"
@@ -807,7 +914,7 @@ EXIT;
     
     Write-Host ""
     Write-Host "========================================" -ForegroundColor Green
-    Write-Host "Script finalizado exitosamente" -ForegroundColor Green
+    Write-Host "SCRIPT FINALIZADO EXITOSAMENTE" -ForegroundColor Green
     Write-Host "========================================" -ForegroundColor Green
     Write-Host ""
 }

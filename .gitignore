@@ -1,0 +1,41 @@
+# Archivos del script PowerShell
+ejecutar_consultas.ps1
+
+# Ejecutables compilados
+ejecutar_consultas.exe
+
+# Directorios de resultados (opcional, si no quieres versionarlos)
+resultados/
+
+# Archivos temporales
+*.tmp
+*.temp
+
+# Archivos de configuración local (si los hay)
+*.local.*
+
+# Logs de ejecución
+*.log
+
+# Archivos de backup
+*.bak
+*.backup
+
+# Archivos de datos temporales
+*.csv.temp
+*.xlsx.temp
+
+# Directorio de archivos temporales del sistema
+Temp/
+
+# Archivos de caché
+.cache/
+
+# Archivos de entorno (opcional)
+.env
+.env.local
+
+# Excepciones (archivos que SÍ queremos versionar)
+!.gitignore
+!README.md
+!consultas/
