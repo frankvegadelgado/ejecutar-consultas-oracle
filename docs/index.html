@@ -23,7 +23,7 @@
 
 <body>
 <h1>Ejecutor de Consultas SQL para Oracle</h1>
-<p>Script automatizado en PowerShell para ejecutar múltiples consultas SQL en Oracle utilizando <strong>Oracle SQLcl</strong> y exportar los resultados a CSV o XLSX (Excel).</p>
+<p>Script automatizado en PowerShell para ejecutar múltiples consultas SQL en Oracle utilizando <strong>Oracle SQLcl</strong> y exportar los resultados a CSV o XLSX (Excel). Incluye validación de solo consultas SELECT, parámetros dinámicos y opciones de contraseña seguras.</p>
 <h2>📋 Requisitos Previos</h2>
 <h3>1. Sistema Operativo</h3>
 <ul>
@@ -315,6 +315,73 @@ Build: 23.4.0.341.0944
 <li><strong>NO es necesario</strong> si solo usa formato CSV</li>
 <li>El script automáticamente convierte CSV a XLSX usando Excel COM Automation</li>
 </ul>
+<h2>🚀 NUEVAS FUNCIONALIDADES</h2>
+<h3>🔐 Sistema de Contraseña Segura por Defecto</h3>
+<p>El script ahora incluye una <strong>contraseña por defecto preconfigurada</strong> que se recomienda usar para mayor seguridad y evitar errores de conexión. Características:</p>
+<ul>
+<li><strong>Valor por defecto:</strong> <code>******</code> (configurable en el código)</li>
+</ul>
+<h3>📄 Sistema de Parámetros para Consultas SQL</h3>
+<p><strong>Nueva funcionalidad:</strong> Ahora puede pasar parámetros dinámicos a sus consultas SQL mediante archivos <code>.txt</code>:</p>
+<h4>Estructura de Archivos:</h4>
+<pre><code>consultas/
+├── mi_consulta.sql      # Consulta SQL con variables &amp;parametro
+└── mi_consulta.txt      # Archivo de parámetros (mismo nombre base)
+</code></pre>
+<h4>Formato del Archivo TXT:</h4>
+<ul>
+<li><strong>Nombres de parámetros</strong> separados por punto y coma (<code>;</code>)</li>
+<li>El script solicitará interactivamente los valores de cada parámetro</li>
+</ul>
+<p><strong>Ejemplo:</strong></p>
+<pre><code class="language-txt"># mi_consulta.txt
+departamento;fecha_inicio;fecha_fin
+</code></pre>
+<h4>Consulta SQL con Variables:</h4>
+<pre><code class="language-sql">-- mi_consulta.sql
+SELECT * FROM empleados 
+WHERE departamento = '&amp;departamento'
+  AND fecha_contratacion BETWEEN '&amp;fecha_inicio' AND '&amp;fecha_fin';
+</code></pre>
+<h4>Flujo de Ejecución:</h4>
+<ol>
+<li>El script detecta <code>mi_consulta.sql</code></li>
+<li>Busca automáticamente <code>mi_consulta.txt</code> en la misma carpeta</li>
+<li>Lee los nombres de parámetros del archivo <code>.txt</code></li>
+<li>Solicita al usuario los valores para cada parámetro</li>
+<li>Sustituye automáticamente las variables en la consulta SQL</li>
+<li>Ejecuta la consulta con los valores ingresados</li>
+</ol>
+<h3>🔒 Validación Estricta de Solo SELECT</h3>
+<p><strong>Seguridad mejorada:</strong> El script ahora valida automáticamente que los archivos SQL contengan <strong>únicamente consultas SELECT</strong>, bloqueando cualquier operación que pueda modificar datos:</p>
+<h4>Operaciones Bloqueadas:</h4>
+<ul>
+<li><strong>DDL:</strong> <code>CREATE</code>, <code>ALTER</code>, <code>DROP</code>, <code>TRUNCATE</code>, <code>RENAME</code></li>
+<li><strong>DML:</strong> <code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>, <code>MERGE</code></li>
+<li><strong>Control de Transacciones:</strong> <code>COMMIT</code>, <code>ROLLBACK</code>, <code>SAVEPOINT</code></li>
+<li><strong>PL/SQL:</strong> <code>BEGIN</code>, <code>END</code>, <code>DECLARE</code>, bloques anónimos</li>
+<li><strong>Ejecución:</strong> <code>EXECUTE</code>, <code>EXEC</code>, <code>CALL</code></li>
+<li><strong>Otros:</strong> <code>GRANT</code>, <code>REVOKE</code>, <code>AUDIT</code>, <code>FLASHBACK</code></li>
+</ul>
+<h4>Ventajas:</h4>
+<ul>
+<li><strong>Seguridad:</strong> Previene ejecución accidental de operaciones peligrosas</li>
+<li><strong>Validación inteligente:</strong> Ignora comentarios para evitar falsos positivos</li>
+<li><strong>Mensajes claros:</strong> Informa exactamente qué operación no permitida se detectó</li>
+<li><strong>Compatibilidad:</strong> Permite <code>WITH</code> (CTE) y consultas complejas válidas</li>
+</ul>
+<h3>💾 Compilación a Ejecutable (.exe)</h3>
+<p>El script puede convertirse a un archivo ejecutable autónomo:</p>
+<h4>Comando de Compilación:</h4>
+<pre><code class="language-powershell">ps2exe -inputFile .\ejecutar_consultas_oracle.ps1 -outputFile .\ejecutar_consultas_oracle.exe -title &quot;Ejecutor de Consultas Oracle&quot; -version &quot;1.0.0.0&quot; -requireAdmin
+</code></pre>
+<h4>Características del Ejecutable:</h4>
+<ul>
+<li><strong>Parámetros preconfigurados:</strong> Incluye contraseña por defecto</li>
+<li><strong>Sin necesidad de PowerShell:</strong> Ejecutable nativo de Windows</li>
+<li><strong>Compatibilidad:</strong> Funciona en cualquier sistema sin requisitos especiales</li>
+<li><strong>Seguridad:</strong> Mantiene todas las validaciones del script original</li>
+</ul>
 <h2>🔐 Configuración de Permisos de PowerShell</h2>
 <h3>¿Por qué es necesario?</h3>
 <p>Por defecto, Windows <strong>bloquea la ejecución de scripts de PowerShell</strong> por seguridad. Debe otorgar permisos temporales para ejecutar este script.</p>
@@ -410,6 +477,7 @@ CurrentUser    RemoteSigned
 ├── 📄 ejecutar_consultas_oracle.ps1
 ├── 📁 consultas/
 │   ├── 📄 consulta1.sql
+│   ├── 📄 consulta1.txt           ← Opcional: parámetros
 │   ├── 📄 consulta2.sql
 │   └── 📄 ...
 └── 📁 resultados/
@@ -431,13 +499,8 @@ New-Item -ItemType Directory -Name &quot;resultados&quot;
 mkdir resultados
 </code></pre>
 <h3>Preparar las Consultas SQL</h3>
-<ol>
-<li>Cree archivos con extensión <code>.sql</code> dentro de la carpeta <code>consultas</code></li>
-<li>Cada archivo debe contener una consulta SQL válida para Oracle</li>
-<li>Los nombres de archivo pueden contener espacios</li>
-<li><strong>NO incluya comandos SQLcl</strong> en sus archivos (como SET, SPOOL, EXIT) - el script los agrega automáticamente</li>
-</ol>
-<p><strong>Ejemplo de archivo SQL</strong> (<code>consultas/ventas_2024.sql</code>):</p>
+<h4>Ejemplo Básico (sin parámetros):</h4>
+<p><strong>Archivo:</strong> <code>consultas/ventas_2024.sql</code></p>
 <pre><code class="language-sql">SELECT 
     cliente_id,
     nombre_cliente,
@@ -447,7 +510,27 @@ WHERE fecha &gt;= TO_DATE('2024-01-01', 'YYYY-MM-DD')
 GROUP BY cliente_id, nombre_cliente
 ORDER BY total_ventas DESC;
 </code></pre>
-<p><strong>IMPORTANTE:</strong> Solo escriba la consulta SELECT (o DML). El script automáticamente agrega los comandos necesarios para formatear y exportar los resultados.</p>
+<h4>Ejemplo con Parámetros:</h4>
+<p><strong>Archivo SQL:</strong> <code>consultas/empleados_por_departamento.sql</code></p>
+<pre><code class="language-sql">SELECT 
+    empleado_id,
+    nombre_completo,
+    fecha_contratacion,
+    salario
+FROM empleados
+WHERE departamento = '&amp;departamento'
+  AND fecha_contratacion &gt; '&amp;fecha_minima';
+</code></pre>
+<p><strong>Archivo TXT (parámetros):</strong> <code>consultas/empleados_por_departamento.txt</code></p>
+<pre><code>departamento;fecha_minima
+</code></pre>
+<p><strong>IMPORTANTE:</strong></p>
+<ul>
+<li>Solo escriba la consulta SELECT (o DML)</li>
+<li>El script automáticamente agrega los comandos necesarios para formatear y exportar los resultados</li>
+<li>Use variables con formato <code>&amp;nombre_parametro</code> en la consulta SQL</li>
+<li>Los nombres de parámetros en el archivo <code>.txt</code> deben coincidir exactamente con los nombres de las variables</li>
+</ul>
 <h2>💻 Uso del Script</h2>
 <h3>Ejecutar el Script</h3>
 <h4>Método 1: Click Derecho (Más Simple)</h4>
@@ -466,6 +549,10 @@ ORDER BY total_ventas DESC;
 </code></pre>
 </li>
 </ol>
+<h4>Método 3: Ejecutable Compilado (.exe)</h4>
+<ol>
+<li><strong>Doble click</strong> en <code>ejecutar_consultas_oracle.exe</code></li>
+</ol>
 <h3>Datos de Entrada Requeridos</h3>
 <p>El script solicitará los siguientes datos <strong>uno por uno</strong>:</p>
 <h4>1. Usuario de Oracle</h4>
@@ -475,16 +562,24 @@ ORDER BY total_ventas DESC;
 <li>Ingrese el nombre de usuario de su base de datos Oracle</li>
 <li>Presione <strong>ENTER</strong></li>
 </ul>
-<h4>2. Contraseña (Enmascarada)</h4>
-<pre><code>Ingrese la contrasena: ************
+<h4>2. Contraseña (Sistema Mejorado)</h4>
+<pre><code>Opciones de contrasena:
+  1. Usar contrasena por defecto (RECOMENDADO)
+  2. Ingresar contrasena personalizada
+
+[ADVERTENCIA] La opcion por defecto es mas segura y evita errores de conexion.
+
+Seleccione opcion de contrasena (1 o 2) [Por defecto: 1]: 
 </code></pre>
-<ul>
-<li>Ingrese la contraseña del usuario</li>
-<li><strong>La contraseña se oculta</strong> mientras escribe (muestra asteriscos)</li>
-<li>Presione <strong>ENTER</strong></li>
-</ul>
+<p><strong>Si selecciona Opción 1:</strong></p>
+<pre><code>[OK] Usando contrasena por defecto
+</code></pre>
+<p><strong>Si selecciona Opción 2:</strong></p>
+<pre><code>Ingrese la contrasena personalizada: ************
+[OK] Contrasena personalizada configurada
+</code></pre>
 <h4>3. Host</h4>
-<pre><code>Ingrese el host (ej: localhost): 192.168.1.100
+<pre><code>Ingrese el host (ej: localhost, 192.168.1.100): 192.168.1.100
 </code></pre>
 <ul>
 <li>Ingrese la dirección IP o nombre del servidor Oracle</li>
@@ -500,7 +595,7 @@ ORDER BY total_ventas DESC;
 <li>Presione <strong>ENTER</strong></li>
 </ul>
 <h4>5. SID o Service Name</h4>
-<pre><code>Ingrese el SID o Service Name: ORCL
+<pre><code>Ingrese el SID o Service Name (ej: ORCL, XE, PDB1): ORCL
 </code></pre>
 <ul>
 <li>Ingrese el SID o nombre del servicio de su base de datos</li>
@@ -521,19 +616,52 @@ ORDER BY total_ventas DESC;
 <li>El script <strong>verifica</strong> la existencia de las carpetas <code>consultas</code> y <code>resultados</code></li>
 <li>Si faltan carpetas, muestra un error y espera que presione ENTER</li>
 <li>Busca la instalación de Oracle SQLcl en las rutas estándar</li>
+<li><strong>Configura variables de entorno Java</strong> para evitar warnings</li>
 <li><strong>Valida la conexión</strong> a Oracle antes de procesar consultas</li>
 <li>Cuenta cuántos archivos <code>.sql</code> hay en la carpeta <code>consultas</code></li>
 <li><strong>Procesa cada consulta</strong> una por una:
 <ul>
-<li>Conecta a Oracle con las credenciales proporcionadas</li>
-<li>Ejecuta la consulta SQL</li>
-<li>Exporta los resultados con un nombre único</li>
+<li><strong>VALIDACIÓN:</strong> Verifica que sea solo consulta SELECT</li>
+<li><strong>PARÁMETROS:</strong> Si existe archivo <code>.txt</code>, solicita valores de parámetros</li>
+<li><strong>CONEXIÓN:</strong> Conecta a Oracle con las credenciales proporcionadas</li>
+<li><strong>EJECUCIÓN:</strong> Ejecuta la consulta SQL con parámetros sustituidos</li>
+<li><strong>EXPORTACIÓN:</strong> Exporta los resultados con un nombre único</li>
 <li>Si eligió XLSX, convierte automáticamente de CSV a Excel</li>
 </ul>
 </li>
 <li>Muestra un resumen del procesamiento con colores</li>
 <li><strong>Siempre espera</strong> que presione ENTER antes de cerrar</li>
 </ol>
+<h3>Ejemplo Completo con Parámetros</h3>
+<h4>Archivo de Consulta:</h4>
+<p><strong><code>consultas/ventas_por_periodo.sql</code>:</strong></p>
+<pre><code class="language-sql">SELECT 
+    producto_id,
+    nombre_producto,
+    SUM(cantidad) as unidades_vendidas,
+    SUM(total) as ingresos_totales
+FROM ventas_detalle
+WHERE fecha_venta BETWEEN '&amp;fecha_inicio' AND '&amp;fecha_fin'
+  AND region = '&amp;region'
+GROUP BY producto_id, nombre_producto
+ORDER BY ingresos_totales DESC;
+</code></pre>
+<h4>Archivo de Parámetros:</h4>
+<p><strong><code>consultas/ventas_por_periodo.txt</code>:</strong></p>
+<pre><code>fecha_inicio;fecha_fin;region
+</code></pre>
+<h4>Ejecución del Script:</h4>
+<pre><code>Procesando: ventas_por_periodo.sql
+  &gt; Salida: ventas_por_periodo_20241218_143022.csv
+  &gt; Leyendo definiciones de parametros desde: ventas_por_periodo.txt
+  Ingrese valor para 'fecha_inicio': 2024-01-01
+  Ingrese valor para 'fecha_fin': 2024-12-31
+  Ingrese valor para 'region': Norte
+  &gt; Validando que sea solo consulta SELECT...
+  [OK] Validacion de SELECT exitosa
+  &gt; Ejecutando consulta (timeout: 30 minutos)...
+  [OK] Archivo CSV generado: ventas_por_periodo_20241218_143022.csv
+</code></pre>
 <h3>Nombres de Archivos de Salida</h3>
 <p>Los archivos de resultados se guardan con el siguiente formato:</p>
 <pre><code>[nombre_consulta]_[fecha]_[hora].[extensión]
@@ -583,6 +711,16 @@ ORDER BY total_ventas DESC;
 <pre><code>[ERROR] El puerto debe estar entre 1 y 65535
 </code></pre>
 <p><strong>Solución:</strong> Ingrese un puerto en el rango válido</p>
+<h4>Error: Script SQL inválido (contiene operaciones no SELECT)</h4>
+<pre><code>Procesando: consulta_peligrosa.sql
+  &gt; Salida: consulta_peligrosa_20241218_143022.csv
+  &gt; Validando que sea solo consulta SELECT...
+  [ERROR] Script SQL invalido
+  Razon: Contiene operacion no permitida: UPDATE
+  Este script solo permite consultas SELECT.
+  Operaciones prohibidas: INSERT, UPDATE, DELETE, DROP, TRUNCATE, CREATE, ALTER, PL/SQL, etc.
+</code></pre>
+<p><strong>Solución:</strong> Revise el archivo SQL y asegúrese de que solo contenga consultas SELECT.</p>
 <h3>Errores de Configuración</h3>
 <h4>Error: Carpeta &quot;consultas&quot; no encontrada</h4>
 <pre><code>[ERROR] No se encontro la carpeta 'consultas'
@@ -735,6 +873,13 @@ Nota: Se requiere Microsoft Excel instalado para exportar a XLSX
 </ul>
 </li>
 <li>
+<p><strong>Agregar archivos de parámetros</strong> (opcional):</p>
+<ul>
+<li><code>ventas_mensuales.txt</code> con contenido: <code>anio;mes</code></li>
+<li><code>top_clientes.txt</code> con contenido: <code>limite_registros</code></li>
+</ul>
+</li>
+<li>
 <p><strong>Ejecutar el script:</strong></p>
 <ul>
 <li>Click derecho en <code>ejecutar_consultas_oracle.ps1</code></li>
@@ -744,11 +889,18 @@ Nota: Se requiere Microsoft Excel instalado para exportar a XLSX
 <li>
 <p><strong>Ingresar datos:</strong></p>
 <pre><code>Usuario: admin_ventas
-Contrasena: ************
+Opcion de contrasena: 1
 Host: db-server.empresa.com
 Puerto: 1521
 SID/Service: PRODDB
 Formato: 1
+</code></pre>
+</li>
+<li>
+<p><strong>Ingresar parámetros</strong> (si aplica):</p>
+<pre><code>Para consulta 'ventas_mensuales.sql':
+Ingrese valor para 'anio': 2024
+Ingrese valor para 'mes': 12
 </code></pre>
 </li>
 <li>
@@ -813,7 +965,6 @@ inventario_actual_20241217_150033.xlsx
 <ul>
 <li>SQLcl puede tardar con consultas que devuelven muchos registros</li>
 <li>El script mostrará el progreso en tiempo real</li>
-<li></li>
 </ul>
 <h3>Formato CSV no se ve bien</h3>
 <ul>
@@ -832,6 +983,13 @@ inventario_actual_20241217_150033.xlsx
 <ul>
 <li><strong>Nunca debería ocurrir</strong> gracias al bloque <code>finally</code></li>
 <li>Si ocurre, ejecute desde PowerShell directamente para ver el error</li>
+</ul>
+<h3>Problemas con parámetros</h3>
+<ul>
+<li><strong>Los nombres en el .txt deben coincidir</strong> exactamente con los nombres de variables en el SQL</li>
+<li>Use solo letras, números y guiones bajos en nombres de parámetros</li>
+<li>El archivo .txt debe usar codificación UTF-8 sin BOM</li>
+<li>Asegúrese de que el archivo .txt no tenga espacios adicionales al final de las líneas</li>
 </ul>
 <h2>🎨 Características del Script PowerShell</h2>
 <h3>Ventajas de Usar SQLcl</h3>
@@ -855,7 +1013,10 @@ inventario_actual_20241217_150033.xlsx
 ✅ <strong>Mejor manejo de strings</strong> - Sin problemas con espacios<br>
 ✅ <strong>Objetos y propiedades</strong> - Código más limpio<br>
 ✅ <strong>Contraseña enmascarada</strong> - Mayor seguridad<br>
-✅ <strong>Conversión automática a Excel</strong> - CSV a XLSX con un click</p>
+✅ <strong>Conversión automática a Excel</strong> - CSV a XLSX con un click<br>
+✅ <strong>Validación de solo SELECT</strong> - Seguridad mejorada<br>
+✅ <strong>Parámetros dinámicos</strong> - Consultas parametrizadas flexibles<br>
+✅ <strong>Contraseña por defecto</strong> - Configuración simplificada</p>
 <h3>Colores Utilizados</h3>
 <ul>
 <li><strong>Cyan</strong>: Títulos y encabezados</li>
@@ -883,9 +1044,27 @@ inventario_actual_20241217_150033.xlsx
 <li>
 <p><strong>Credenciales:</strong></p>
 <ul>
-<li>Nunca guarde contraseñas en el script</li>
+<li>La <strong>contraseña por defecto</strong> es más segura para entornos controlados</li>
+<li>Nunca guarde contraseñas en el script o archivos de texto plano</li>
 <li>La contraseña se enmascara automáticamente durante la entrada</li>
 <li>Considere usar Oracle Wallet para credenciales frecuentes</li>
+</ul>
+</li>
+<li>
+<p><strong>Validación de Consultas:</strong></p>
+<ul>
+<li>El script valida automáticamente que solo sean consultas SELECT</li>
+<li>Revise todas las consultas antes de ejecutarlas</li>
+<li>Evite consultas con <code>DELETE</code> o <code>UPDATE</code> sin <code>WHERE</code></li>
+<li>Use permisos de solo lectura cuando sea posible</li>
+</ul>
+</li>
+<li>
+<p><strong>Parámetros:</strong></p>
+<ul>
+<li>Los archivos .txt solo contienen nombres de parámetros, no valores</li>
+<li>Los valores se solicitan interactivamente y no se almacenan</li>
+<li>Use nombres descriptivos para los parámetros</li>
 </ul>
 </li>
 <li>
@@ -893,15 +1072,6 @@ inventario_actual_20241217_150033.xlsx
 <ul>
 <li>Use <code>RemoteSigned</code> en lugar de <code>Unrestricted</code></li>
 <li>Restaure a <code>Restricted</code> cuando termine de usar el script</li>
-</ul>
-</li>
-<li>
-<p><strong>Consultas SQL:</strong></p>
-<ul>
-<li>Revise todas las consultas antes de ejecutarlas</li>
-<li>Evite consultas con <code>DELETE</code> o <code>UPDATE</code> sin <code>WHERE</code></li>
-<li>Use permisos de solo lectura cuando sea posible</li>
-<li>No incluya credenciales en los archivos .sql</li>
 </ul>
 </li>
 <li>
@@ -976,6 +1146,11 @@ inventario_actual_20241217_150033.xlsx
 <td>✅ Excelente</td>
 <td>✅ Bueno</td>
 </tr>
+<tr>
+<td><strong>Validación SQL</strong></td>
+<td>✅ Con este script</td>
+<td>❌ No</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Conclusión:</strong> SQLcl es la mejor opción para automatización moderna con Oracle.</p>
@@ -984,7 +1159,8 @@ inventario_actual_20241217_150033.xlsx
 <h2>🤝 Contribuciones</h2>
 <p>Para reportar problemas o sugerir mejoras, por favor contacte al desarrollador del proyecto.</p>
 <hr>
-<p><strong>Versión del Script:</strong> 3.0 (PowerShell + Oracle SQLcl)<br>
+<p><strong>Versión del Script:</strong> 4.0 (PowerShell + Oracle SQLcl)<br>
+<strong>Características Principales:</strong> Validación SELECT, parámetros dinámicos, contraseña por defecto<br>
 <strong>Fecha:</strong> Diciembre 2025<br>
 <strong>Compatible con:</strong> Oracle SQLcl 23.x+, Windows 10+, PowerShell 5.1+, Oracle 11g-23c</p>
 </body>
