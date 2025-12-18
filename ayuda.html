@@ -1,0 +1,193 @@
+<html>
+
+<head>
+  <title>Ejecutor de Consultas</title>
+  <style>
+    body {
+      background-color: black;
+      color: white;
+    }
+
+    code:not(.language-diff) {
+      background-color: white;
+      color: black;
+      display: inline-block;
+    }
+
+    code.language-diff {
+      background-color: while;
+      color: green;
+    }
+  </style>
+</head>
+
+<body>
+<h1>Ejecutor de Consultas SQL para Oracle - Guía de Usuario</h1>
+<h2>📋 Requisitos Previos</h2>
+<h3>1. Sistema Operativo</h3>
+<ul>
+<li>Windows 10 o superior</li>
+</ul>
+<h3>2. Java - Instalación Requerida</h3>
+<p><strong>Oracle SQLcl requiere Java 17 o superior</strong> para funcionar. <strong>DEBE instalar Java antes de continuar.</strong></p>
+<h4>Paso 1: Verificar si Java está Instalado</h4>
+<p>Abra PowerShell o CMD y ejecute:</p>
+<pre><code class="language-powershell">java -version
+</code></pre>
+<p>Si muestra un error o una versión menor a 17, necesita instalar Java.</p>
+<h4>Paso 2: Instalar Java (Oracle JDK)</h4>
+<ol>
+<li>Visite: <strong>https://www.oracle.com/java/technologies/downloads/</strong></li>
+<li>Descargue <strong>Java 17 o superior</strong> (versión LTS)</li>
+<li>Ejecute el instalador <code>.exe</code> descargado</li>
+<li>Siga el asistente de instalación completo</li>
+<li><strong>No omita ningún paso</strong> durante la instalación</li>
+</ol>
+<h4>Paso 3: Verificar la Instalación</h4>
+<p>Después de instalar, cierre y abra una nueva ventana de PowerShell/CMD y ejecute:</p>
+<pre><code class="language-powershell">java -version
+</code></pre>
+<p>Debería mostrar algo como:</p>
+<pre><code>java version &quot;17.0.9&quot; 2023-10-17 LTS
+Java(TM) SE Runtime Environment (build 17.0.9+11-LTS-201)
+</code></pre>
+<h3>3. Oracle SQLcl - Instalación Requerida</h3>
+<p><strong>DEBE instalar Oracle SQLcl para que el programa funcione.</strong></p>
+<h4>Paso 1: Descargar Oracle SQLcl</h4>
+<ol>
+<li>Visite: <strong>https://www.oracle.com/database/sqldeveloper/technologies/sqlcl/download/</strong></li>
+<li>Descargue la versión más reciente (archivo <code>.zip</code>)</li>
+</ol>
+<h4>Paso 2: Instalar Oracle SQLcl</h4>
+<ol>
+<li><strong>Extraiga el archivo ZIP completo</strong></li>
+<li>Extraiga a: <code>C:\oracle\sqlcl\</code>
+<ul>
+<li>Esta ruta es <strong>IMPORTANTE</strong> - úsela exactamente así</li>
+</ul>
+</li>
+<li>La estructura debe quedar así:<pre><code>C:\oracle\sqlcl\
+├── bin\
+│   ├── sql.exe
+│   └── sql.bat
+├── lib\
+└── LICENSE.txt
+</code></pre>
+</li>
+</ol>
+<h4>Paso 3: Verificar la Instalación</h4>
+<p>Abra PowerShell o CMD y ejecute:</p>
+<pre><code class="language-powershell">C:\oracle\sqlcl\bin\sql.exe -V
+</code></pre>
+<p>Debería mostrar:</p>
+<pre><code>SQLcl: Release 23.4 Production
+Build: 23.4.0.341.0944
+</code></pre>
+<h2>🚀 Configuración del Proyecto</h2>
+<h3>Estructura de Carpetas</h3>
+<p><strong>ANTES de ejecutar el programa, DEBE crear estas carpetas:</strong></p>
+<p>En el mismo directorio donde está <code>ejecutar_consultas_oracle.exe</code>, cree:</p>
+<pre><code>📁 [Directorio del Proyecto]
+├── 📄 ejecutar_consultas_oracle.exe
+├── 📁 consultas/          ← CREAR ESTA CARPETA
+│   └── (aquí se colocan los archivos .sql)
+└── 📁 resultados/         ← CREAR ESTA CARPETA
+    └── (aquí se guardarán los archivos generados)
+</code></pre>
+<h3>Crear las Carpetas</h3>
+<h4>Método 1: Desde el Explorador de Archivos</h4>
+<ol>
+<li>Haga clic derecho en el área vacía donde está el archivo <code>.exe</code></li>
+<li>Seleccione <strong>&quot;Nuevo&quot; &gt; &quot;Carpeta&quot;</strong></li>
+<li>Nombre la carpeta: <code>consultas</code></li>
+<li>Repita para crear: <code>resultados</code></li>
+</ol>
+<h4>Método 2: Desde CMD</h4>
+<pre><code class="language-cmd">mkdir consultas
+mkdir resultados
+</code></pre>
+<h2>💻 Uso del Programa</h2>
+<h3>Ejecutar el Programa</h3>
+<ol>
+<li><strong>Doble clic</strong> en <code>ejecutar_consultas_oracle.exe</code></li>
+<li>Se abrirá una ventana de consola</li>
+</ol>
+<h3>Datos de Entrada Requeridos</h3>
+<p>El programa solicitará:</p>
+<h4>1. Usuario de Oracle</h4>
+<pre><code>Ingrese el usuario de Oracle:
+</code></pre>
+<ul>
+<li>Ingrese su nombre de usuario de Oracle</li>
+<li>Presione <strong>ENTER</strong></li>
+</ul>
+<h4>2. Contraseña</h4>
+<pre><code>Opciones de contrasena:
+  1. Usar contrasena por defecto (RECOMENDADO)
+  2. Ingresar contrasena personalizada
+
+Seleccione opcion de contrasena (1 o 2) [Por defecto: 1]: 
+</code></pre>
+<ul>
+<li>Ingrese <code>1</code> para usar la contraseña por defecto (recomendado)</li>
+<li>O ingrese <code>2</code> para ingresar una contraseña personalizada</li>
+</ul>
+<h4>3. Host</h4>
+<pre><code>Ingrese el host (ej: localhost, 192.168.1.100):
+</code></pre>
+<ul>
+<li>Ingrese la dirección del servidor Oracle</li>
+<li>Presione <strong>ENTER</strong></li>
+</ul>
+<h4>4. Puerto</h4>
+<pre><code>Ingrese el puerto (ej: 1521):
+</code></pre>
+<ul>
+<li>Ingrese el puerto (Oracle usa 1521 por defecto)</li>
+<li>Presione <strong>ENTER</strong></li>
+</ul>
+<h4>5. SID o Service Name</h4>
+<pre><code>Ingrese el SID o Service Name (ej: ORCL, XE, PDB1):
+</code></pre>
+<ul>
+<li>Ingrese el nombre de la base de datos</li>
+<li>Presione <strong>ENTER</strong></li>
+</ul>
+<h4>6. Formato de Salida</h4>
+<pre><code>Formato de salida (1=CSV, 2=XLSX/Excel) [Por defecto: 1]:
+</code></pre>
+<ul>
+<li>Ingrese <code>1</code> para CSV</li>
+<li>Ingrese <code>2</code> para Excel (requiere Microsoft Excel instalado)</li>
+<li>Presione <strong>ENTER</strong></li>
+</ul>
+<h3>Proceso de Ejecución</h3>
+<ol>
+<li>Verifica que las carpetas <code>consultas</code> y <code>resultados</code> existan</li>
+<li>Busca archivos <code>.sql</code> en la carpeta <code>consultas</code></li>
+<li>Procesa cada archivo SQL</li>
+<li>Guarda resultados en la carpeta <code>resultados</code></li>
+<li>Muestra resumen final</li>
+<li>Espera que presione <strong>ENTER</strong> para cerrar</li>
+</ol>
+<h2>❌ Errores Comunes</h2>
+<h3>Error: Java no instalado</h3>
+<pre><code>Error: Java no está instalado
+</code></pre>
+<p><strong>Solución:</strong> Instale Java 17 o superior siguiendo los pasos en &quot;Java - Instalación Requerida&quot;.</p>
+<h3>Error: Oracle SQLcl no encontrado</h3>
+<pre><code>[ERROR] No se pudo encontrar Oracle SQLcl instalado
+</code></pre>
+<p><strong>Solución:</strong> Instale Oracle SQLcl siguiendo los pasos en &quot;Oracle SQLcl - Instalación Requerida&quot;.</p>
+<h3>Error: Carpetas no encontradas</h3>
+<pre><code>[ERROR] No se encontro la carpeta 'consultas'
+</code></pre>
+<p><strong>Solución:</strong> Cree las carpetas <code>consultas</code> y <code>resultados</code> como se explica en &quot;Estructura de Carpetas&quot;.</p>
+<h3>Error: No hay archivos SQL</h3>
+<pre><code>[ADVERTENCIA] No se encontraron archivos .sql en la carpeta 'consultas'
+</code></pre>
+<p><strong>Solución:</strong> Coloque archivos <code>.sql</code> dentro de la carpeta <code>consultas</code>.</p>
+<hr>
+<p><strong>Fecha:</strong> Diciembre 2025</p>
+</body>
+</html>
